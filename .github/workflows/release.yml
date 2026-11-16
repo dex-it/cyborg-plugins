@@ -1,0 +1,90 @@
+name: Release
+
+# Выпуск бандлов: тег v<версия> собирает все бандлы с архивами и создаёт релиз GitHub с приложенными .tgz.
+#   push тега v*       - сборка (build) и релиз (release);
+#   workflow_dispatch  - репетиция: та же сборка, архивы прикладываются к запуску, релиз не создаётся.
+# Версия в теге обязана совпасть с version в package.json, коммит тега - входить в master.
+# Версии самих бандлов независимы и записаны в bundles/*.json.
+# Пакеты ядра собираются из клона (HARNESS_REF), как в ci.yml, пока они не опубликованы.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build bundles
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Тег совпадает с версией и входит в master
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          if [ "${GITHUB_REF_NAME}" != "v${version}" ]; then
+            echo "::error::тег ${GITHUB_REF_NAME} не совпадает с версией package.json (v${version})"
+            exit 1
+          fi
+          git fetch --no-tags origin master
+          if ! git merge-base --is-ancestor "${GITHUB_SHA}" FETCH_HEAD; then
+            echo "::error::коммит тега не входит в master"
+            exit 1
+          fi
+      - name: Ядро (клон)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: dex-it/cyborg-harness
+          ref: ${{ vars.HARNESS_REF || 'master' }}
+          path: .harness
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - name: Ядро (сборка пакетов)
+        working-directory: .harness
+        run: |
+          npm ci --ignore-scripts
+          npm run build:packages
+      - run: npm ci
+      - run: npm run harness:link -- .harness
+      - run: npm run check
+      - run: npm test
+      - run: npm run bundle -- --all --pack
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: bundles
+          path: dist/bundles/*.tgz
+          if-no-files-found: warn
+
+  release:
+    name: GitHub release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: bundles
+          path: bundles
+      - name: Создать релиз
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          shopt -s nullglob
+          files=(bundles/*.tgz)
+          gh release create "${GITHUB_REF_NAME}" "${files[@]}" --title "${GITHUB_REF_NAME}" --generate-notes
