@@ -3,7 +3,7 @@
     "cyborg.projects": {"members": ["list", "selected", "hasSelected", "roots", "onChange"]},
     "cyborg.project-settings": {"members": ["section", "load", "validate", "save", "onChange"]},
     "cyborg.editor": {"members": ["open", "openWithValidation"]},
-    "cyborg.sessions": {"members": ["onChange", "reveal", "create", "send", "paste", "labels", "uses"]},
+    "cyborg.sessions": {"members": ["onChange", "reveal", "create", "send", "paste", "labels", "setLabels", "find", "uses"]},
     "cyborg.git": {"members": ["status", "onChange", "root", "branch", "headContent", "branches", "switch", "remotes", "files"]},
     "cyborg.session-prompt": {"members": ["fragment", "order"]},
     "cyborg.agent": {"members": ["facts", "launch", "watch", "ended", "history"]},
@@ -11,7 +11,6 @@
     "cyborg.tree-decoration": {"members": ["marks", "onChange"]}
   },
   "plugins": {
-    "sessions": {"provides": {"cyborg.sessions": "1.2"}, "requires": {"cyborg.projects": "^1"}, "consumes": {"cyborg.agent": "^1", "cyborg.session-prompt": "^1", "cyborg.agent-tool": "^1"}},
     "next-actions": {"provides": {"cyborg.agent-tool": "1.0", "cyborg.session-prompt": "1.0"}},
     "git": {"provides": {"cyborg.git": "1.0", "cyborg.tree-decoration": "1.0"}, "optional": {"cyborg.sessions": "^1"}},
     "files": {"requires": {"cyborg.projects": "^1"}, "optional": {"cyborg.sessions": "^1", "cyborg.git": "^1"}, "consumes": {"cyborg.tree-decoration": "^1"}},

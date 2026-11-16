@@ -1,0 +1,33 @@
+{
+  "$schema": "../../../node_modules/@cyborg-harness/contracts/manifest.schema.json",
+  "id": "sessions",
+  "version": "1.0.0",
+  "engines": { "cyborg": "^1" },
+  "provides": { "cyborg.sessions": "1.2" },
+  "requires": { "cyborg.projects": "^1" },
+  "consumes": { "cyborg.agent": "^1", "cyborg.session-prompt": "^1", "cyborg.agent-tool": "^1" },
+  "commands": {
+    "sessions.agents": {},
+    "sessions.create": { "args": ["record"] },
+    "sessions.resume": { "args": ["record"] },
+    "sessions.kill": { "args": ["string"] },
+    "sessions.write": { "args": ["string", "string"] },
+    "sessions.resize": { "args": ["string", "number", "number"] },
+    "sessions.previous": {},
+    "sessions.running": {},
+    "sessions.reopen": { "args": ["string"] },
+    "sessions.restore": { "args": ["string"] }
+  },
+  "documents": { "session": { "restorable": true, "area": "main", "order": 100 } },
+  "permissions": {
+    "fs.read": ["workspace"],
+    "pty": [
+      {
+        "program": "$SHELL",
+        "args": ["-lc", "exec claude --settings \"$CYBORG_SETTINGS\" \"$@\"", "cyborg"],
+        "env": ["CYBORG_EVENTS", "CYBORG_SETTINGS", "CYBORG_MCP_TOKEN"],
+        "deny": ["--dangerously-skip-permissions", "--permission-mode", "--allowedTools", "--allowed-tools", "--disallowedTools", "--tools"]
+      }
+    ]
+  }
+}

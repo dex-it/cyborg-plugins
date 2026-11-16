@@ -1,9 +1,9 @@
-// Типы контрактов, которых ещё нет в @cyborg-harness/contracts: cyborg.projects, cyborg.project-settings, cyborg.editor.
+// Типы контрактов, которых ещё нет в @cyborg-harness/contracts: cyborg.projects, cyborg.project-settings, cyborg.editor, а также расширение cyborg.sessions 1.2.
 // Только типы и дополнение карты Contracts, кода здесь нет: потребитель берёт файл через `import type`, а `cyborg-plugin check`
 // с `--declarations-package @cyborg-plugins/contracts` не пускает отсюда значения в код плагина.
 // Типы временные: после cyborg-harness#256 переезжают в пакет ядра, а этот пакет исчезает (README рядом).
 
-import type { Subscription } from '@cyborg-harness/contracts';
+import type { Sessions, Subscription } from '@cyborg-harness/contracts';
 
 declare module '@cyborg-harness/contracts' {
   interface Contracts {
@@ -122,4 +122,84 @@ export interface Editor {
    * Функция проверки через границу плагинов не проходит, поэтому проверка - данные, а не обратный вызов.
    */
   openWithValidation(request: EditRequest & { readonly schema: Readonly<Record<string, unknown>> }): Promise<EditResult>;
+}
+
+// ---------- cyborg.sessions 1.2 ----------
+
+/** Привязка сессии к задаче или MR трекера. Живёт только в памяти плагина `sessions` (FR-1015, FR-2014): после перезапуска приложения её нет. */
+export interface SessionBinding {
+  /** Ключ объекта в трекере: номер задачи или MR, ключ Jira; трекер сам делает его уникальным в разрезе проекта (общий remote у двух проектов их сессий не смешивает). Вместе с видом (`task` или `mr`) называет объект: одна сессия на объект. */
+  readonly key: string;
+  /** Название для заголовка вкладки. */
+  readonly title: string;
+  /** Статус для заголовка («открыта», «закрыта», метки); обновляет трекер по мере обновления панели. */
+  readonly status?: string;
+  /** Ссылка на объект в трекере. */
+  readonly url?: string;
+}
+
+/** Виды привязки: задача и MR. */
+export type SessionBindingKind = 'task' | 'mr';
+
+/** Метки сессии: сегодня это привязка к задаче и к MR; новое поле меток - минорная версия. */
+export interface SessionLabels {
+  readonly task?: SessionBinding;
+  readonly mr?: SessionBinding;
+}
+
+/** Правка меток: поле со значением ставит привязку, `null` снимает её, не названное - не трогает. */
+export type SessionLabelsPatch = { readonly [K in SessionBindingKind]?: SessionBinding | null };
+
+/** Что нужно, чтобы открыть сессию. Каталоги проверяет `sessions` по репозиториям проектов (`cyborg.projects`). */
+export interface SessionCreateRequest {
+  /** Рабочий каталог: репозиторий одного из проектов. */
+  readonly cwd: string;
+  /** Дополнительные каталоги (`--add-dir`): тоже репозитории проектов. */
+  readonly addDirs?: readonly string[];
+  /** Первый запрос человека; пустой - сессия ждёт ввода. */
+  readonly prompt?: string;
+  /** Плагин-агент (`id` поставщика `cyborg.agent`); не назван - первый найденный по порядку id. */
+  readonly agent?: string;
+  /** Продолжить прошлую сессию агента (`id` из `history`). */
+  readonly resumeId?: string;
+  /** Привязка к задаче или MR с самого начала: вкладка получает заголовок без гонки с `setLabels`. */
+  readonly labels?: SessionLabels;
+}
+
+/** Открытая сессия. */
+export interface SessionHandle {
+  /** Устойчивый id сессии у `sessions`, тот же, что `SessionEvent.sessionId`. */
+  readonly sessionId: string;
+  /** Подпись для человека (заголовок вкладки). */
+  readonly title: string;
+}
+
+/** Параметры вставки. */
+export interface PasteOptions {
+  /** После вставки отправить Enter отдельной записью (через паузу: пакет «текст и Enter» TUI вправе принять за вставку). */
+  readonly submit?: boolean;
+}
+
+/**
+ * `cyborg.sessions` 1.2, кратность one, поставщик `sessions`: расширение интерфейса ядра (`Sessions`: `onChange`, `reveal`) членами каталога контрактов,
+ * которых в типах ядра ещё нет ([cyborg-harness#257](https://github.com/dex-it/cyborg-harness/issues/257)). Типы временные и переедут в пакет ядра.
+ * Потребитель берёт поставщика как `Remote<SessionsV12>` и проверяет, что нужный член есть: поставщик 1.0 и 1.1 их не даёт.
+ */
+export interface SessionsV12 extends Sessions {
+  /** У поставщика 1.2 `reveal` есть всегда (в типе ядра он необязателен ради 1.0). */
+  reveal(sessionId: string): Promise<void>;
+  /** Открывает сессию агента. Каталог вне репозиториев проектов, агент, которого нет или который не найден, и негодный `resumeId` - отказ с понятным текстом. */
+  create(request: SessionCreateRequest): Promise<SessionHandle>;
+  /** Ввод в сессию как с клавиатуры: текст идёт в pty без обёртки, перевод строки в нём - нажатие Enter. Не больше 1 МиБ; сессии нет или она вышла - отказ. */
+  send(sessionId: string, text: string): Promise<void>;
+  /** Вставка текста в строку ввода агента (bracketed paste) без Enter, если не просили `submit`. Управляющие символы из текста убираются: ESC закрыл бы вставку. */
+  paste(sessionId: string, text: string, options?: PasteOptions): Promise<void>;
+  /** Метки сессии; сессии нет (не этого запуска) - `null`. */
+  labels(sessionId: string): Promise<SessionLabels | null>;
+  /** Меняет метки (только в памяти) и возвращает итог. Привязку к тому же объекту, которую держала другая сессия, эта забирает себе: объект трекера - у одной сессии. Сессии нет - отказ. */
+  setLabels(sessionId: string, patch: SessionLabelsPatch): Promise<SessionLabels>;
+  /** Живая сессия, привязанная к объекту трекера; нет такой или она вышла - `null`: привязка выходом снимается. */
+  find(kind: SessionBindingKind, key: string): Promise<string | null>;
+  /** Идёт ли живая сессия, запущенная с каталогом `root` (рабочим или из `--add-dir`): git не меняет ветку под работающей сессией. Текущий каталог после перехода в worktree не считается. */
+  uses(root: string): Promise<boolean>;
 }
