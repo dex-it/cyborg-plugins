@@ -51,6 +51,8 @@ export interface LauncherHooks {
   event(tab: Tab, e: AgentEvent): void;
   /** Процесс вышел либо запуск не удался: токен отозван, очередь снята. */
   ended(sessionId: string): void;
+  /** Вкладку закрыл человек или инструмент: процесс завершён после того, как вкладку убрали из реестра (до `ended`). */
+  closed?(sessionId: string): void;
 }
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -166,8 +168,10 @@ export function createLauncher(ctx: PluginContext, pty: OsPty, registry: Registr
     let resumeId = saved.resumeId;
     handle.onExit((exit) => {
       over = true;
-      if (registry.get(sessionId) === tab) registry.ended(sessionId);
+      const closedByUser = registry.get(sessionId) !== tab;
+      if (!closedByUser) registry.ended(sessionId);
       registry.emit(tab, { type: 'exit', code: exit.code });
+      if (closedByUser) hooks?.closed?.(sessionId);
       hooks?.ended(sessionId);
       unwatch?.();
       if (!provider) return;

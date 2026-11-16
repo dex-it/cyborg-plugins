@@ -1,4 +1,5 @@
 import type { PluginModule } from '@cyborg-harness/contracts';
+import type { SessionsV13 } from '@cyborg-plugins/contracts';
 import { registerCommands } from './commands.ts';
 import { CONTRACT_VERSION, createContract } from './contract.ts';
 import { createDelegate } from './delegate.ts';
@@ -24,7 +25,8 @@ const plugin: PluginModule = {
     delegate.bind(launcher);
     const input = createInput(registry);
     const bridge = createBridge(ctx, registry, launcher);
-    ctx.contracts.provide('cyborg.sessions', CONTRACT_VERSION, bridge.decorate(createContract(ctx, registry, launcher, input)));
+    const sessions: SessionsV13 = { ...bridge.decorate(createContract(ctx, registry, launcher, input)), adoptRemote: (sessionId, remote) => delegate.adoptRemote(sessionId, remote) };
+    ctx.contracts.provide('cyborg.sessions', CONTRACT_VERSION, sessions);
     registerCommands(ctx, registry, launcher, input, bridge.opened);
     delegate.registerCommands();
     await delegate.start();

@@ -23,6 +23,26 @@ export class Tokens {
     return token;
   }
 
+  /** Токен выдан этой сессии и ещё не отозван. */
+  has(sessionId: string): boolean {
+    return this.bySession.has(sessionId);
+  }
+
+  /**
+   * Токен, которым сессия уже пользуется вне Cyborg: у удалённой сессии его держит демон на хосте (`remote-sessions`, решение 13).
+   * Принимается только для сессии, которой токен уже выдан (она запускается или идёт), по форме выданного (43 знака base64url) и если он не чужой.
+   * Выданный `issue` токен заменяется. false - не принят.
+   */
+  adopt(sessionId: string, token: string): boolean {
+    if (!this.bySession.has(sessionId) || !/^[A-Za-z0-9_-]{43}$/.test(token)) return false;
+    const holder = this.byToken.get(token);
+    if (holder !== undefined && holder !== sessionId) return false;
+    this.revoke(sessionId);
+    this.bySession.set(sessionId, token);
+    this.byToken.set(token, sessionId);
+    return true;
+  }
+
   /** Сессия по токену; неизвестный или отозванный токен - `undefined`. */
   sessionOf(token: string): string | undefined {
     return this.byToken.get(token);
