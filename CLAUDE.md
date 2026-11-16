@@ -13,6 +13,7 @@ Cyborg Plugins - репозиторий плагинов для приложен
 - Тесты - `npm test` (node --test скриптов и тесты каждого плагина); без `harness:link` один тест сборки бандла пропускается
 - Страницы каталога сайта - `npm run docs:catalog`, сверка `npm run check:docs-catalog`
 - Бандлы - `npm run bundle -- <id>|--all [--pack] [--out <каталог>]`
+- Пробелы контрактов относительно типов ядра - `npm run contracts:gap [-- --strict]`; модель - `plugins/planned-contracts.json` (запланированные плагины), замкнутость запланированных бандлов проверяет `npm run check`
 - Метки GitHub - файл `.github/labels.json`, применяет `npm run sync-labels [-- --dry-run|--prune]` (система как в cyborg-harness: type, level, component, category, stage, priority, status, platform, effort)
 - Новый плагин - `npm run new -- <категория> <id> ["Название"]`
 - Сайт - `cd site && npm ci && npm run build && npm run verify`
@@ -22,9 +23,10 @@ Cyborg Plugins - репозиторий плагинов для приложен
 
 - `plugins/<категория>/<id>/` - плагины; перечень категорий и запланированных плагинов - `plugins/categories.json`; категория определяется только путём, в манифест она не пишется (манифест ядра не принимает чужих полей)
 - `plugins/<категория>/<id>/README.md` - карточка плагина: шапка `---` (title, summary, status, tags, needs), дальше описание с `##`
+- `plugins/planned-contracts.json` - проектная модель контрактов запланированных плагинов (provides, requires, optional, consumes, нужные члены); готовый плагин из неё убирается
 - `bundles/<id>.json` - бандл (`format: 1`, id равен имени файла, version, title, description, extends, plugins); `bundles/planned.json` - запланированные наборы
 - `templates/plugin/` - шаблон для `npm run new`; токены `__ID__` и `__TITLE__`
-- `scripts/` - `check.ts`, `each-plugin.ts`, `bundle.ts`, `new-plugin.ts`, `gen-catalog.ts`, `link-harness.ts`, `sync-labels.ts`; `scripts/lib/` - каталог (`catalog.ts`), бандлы и полнота (`bundles.ts`), версии контрактов (`semver.ts`), метки (`labels.ts`), сборка бандла (`build-bundle.ts`), поиск `cyborg-plugin` (`harness.ts`); `scripts/test/` - тесты на временных репозиториях; `scripts/render-svg.cjs` - рендер SVG в PNG через Electron (значок, og.png)
+- `scripts/` - `check.ts`, `each-plugin.ts`, `bundle.ts`, `new-plugin.ts`, `gen-catalog.ts`, `link-harness.ts`, `sync-labels.ts`; `scripts/lib/` - каталог (`catalog.ts`), бандлы и полнота (`bundles.ts`), версии контрактов (`semver.ts`), метки (`labels.ts`), модель контрактов и пробелы (`design.ts`), сборка бандла (`build-bundle.ts`), поиск `cyborg-plugin` (`harness.ts`); `scripts/test/` - тесты на временных репозиториях; `scripts/render-svg.cjs` - рендер SVG в PNG через Electron (значок, og.png)
 - `docs/guide/` - страницы сайта; `docs/guide/catalog/` генерируется, руками не правится
 - `site/` - сборка сайта (Astro и Starlight), устроена как сайт ядра; адрес и бренд - `site/site.config.mjs`
 - `assets/` - `icon.svg` (значок, продолжает значок ядра), `og.svg` (источник `site/public/og.png`)

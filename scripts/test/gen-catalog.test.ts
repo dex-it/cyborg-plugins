@@ -17,7 +17,7 @@ describe('страницы каталога', () => {
   it('на каждую категорию и плагин - страница, плюс главная и бандлы', () => {
     using repo = makeRepo(repoWith(PLUGINS, { 'bundles/work.json': BUNDLE }));
     const pages = generatePages(repo.root);
-    assert.deepEqual([...pages.keys()].sort(), ['bundles.md', 'code/files.md', 'code/index.md', 'code/projects.md', 'index.md', 'sessions/index.md']);
+    assert.deepEqual([...pages.keys()].sort(), ['bundles.md', 'code/files.md', 'code/index.md', 'code/projects.md', 'contracts.md', 'index.md', 'sessions/index.md']);
   });
 
   it('страница плагина: факты из манифеста и текст карточки', () => {

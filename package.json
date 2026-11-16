@@ -14,6 +14,7 @@
     "test": "node --test scripts/test/*.test.ts && node scripts/each-plugin.ts test",
     "bundle": "node scripts/bundle.ts",
     "new": "node scripts/new-plugin.ts",
+    "contracts:gap": "node scripts/contracts.ts",
     "sync-labels": "node scripts/sync-labels.ts",
     "docs:catalog": "node scripts/gen-catalog.ts",
     "check:docs-catalog": "node scripts/gen-catalog.ts --check"

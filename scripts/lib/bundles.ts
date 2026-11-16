@@ -7,11 +7,11 @@ import path from 'node:path';
 import { ID_PATTERN, isRecord, isStringList, readJson, unknownKeys } from './util.ts';
 import type { Problem } from './util.ts';
 import { isPluginVersion, providedVersions, rangeAccepts } from './semver.ts';
-import type { Catalog, PluginEntry } from './catalog.ts';
+import type { Catalog } from './catalog.ts';
 
 export const BUNDLE_FORMAT = 1;
 const BUNDLE_KEYS = ['format', 'id', 'version', 'title', 'description', 'extends', 'plugins'];
-const PLANNED_BUNDLE_KEYS = ['id', 'title', 'summary', 'plugins'];
+const PLANNED_BUNDLE_KEYS = ['id', 'title', 'summary', 'extends', 'plugins'];
 
 export interface Bundle {
   id: string;
@@ -27,6 +27,7 @@ export interface PlannedBundle {
   id: string;
   title: string;
   summary: string;
+  extends: string[];
   plugins: string[];
 }
 
@@ -81,7 +82,8 @@ export function loadBundles(root: string, catalog: Catalog, problems: Problem[])
           continue;
         }
         for (const key of unknownKeys(item, PLANNED_BUNDLE_KEYS)) problems.push({ where: at, message: `неизвестное поле ${key}` });
-        planned.push({ id: item.id, title: item.title, summary: item.summary, plugins: item.plugins });
+        if (item.extends !== undefined && !isStringList(item.extends)) problems.push({ where: at, message: 'extends - список id бандлов' });
+        planned.push({ id: item.id, title: item.title, summary: item.summary, extends: isStringList(item.extends) ? item.extends : [], plugins: item.plugins });
       }
     } else if (raw !== undefined) {
       problems.push({ where: 'bundles/planned.json', message: 'ожидался список' });
@@ -94,10 +96,14 @@ export function loadBundles(root: string, catalog: Catalog, problems: Problem[])
     if (seen.has(b.id)) problems.push({ where: b.rel, message: `бандл ${b.id} повторён` });
     seen.add(b.id);
   }
+  const knownBundles = new Set([...real, ...planned.map((p) => p.id)]);
   const knownPlugins = new Set(catalog.plugins.map((p) => p.id));
   const plannedPlugins = new Set(catalog.categories.flatMap((c) => c.planned.map((p) => p.id)));
   for (const p of planned) {
     if (real.has(p.id)) problems.push({ where: 'bundles/planned.json', message: `бандл ${p.id} уже есть: уберите его из planned.json` });
+    for (const parent of p.extends) {
+      if (!knownBundles.has(parent)) problems.push({ where: 'bundles/planned.json', message: `бандл ${p.id} расширяет ${parent}, которого нет ни среди готовых, ни среди запланированных` });
+    }
     for (const pluginId of p.plugins) {
       if (!knownPlugins.has(pluginId) && !plannedPlugins.has(pluginId)) problems.push({ where: 'bundles/planned.json', message: `в бандле ${p.id} плагин ${pluginId}, которого нет ни в каталоге, ни в planned категорий` });
     }
@@ -105,19 +111,27 @@ export function loadBundles(root: string, catalog: Catalog, problems: Problem[])
   return { bundles, planned };
 }
 
+/** То, что нужно для раскрытия `extends`: и готовый, и запланированный бандл. */
+export interface BundleLike {
+  id: string;
+  extends: string[];
+  plugins: string[];
+  rel?: string;
+}
+
 /** Плагины бандла вместе с унаследованными, в порядке: сначала расширяемые бандлы, затем свои. Без повторов. */
-export function resolveBundle(id: string, bundles: readonly Bundle[], problems: Problem[]): string[] {
+export function resolveBundle(id: string, bundles: readonly BundleLike[], problems: Problem[]): string[] {
   const byId = new Map(bundles.map((b) => [b.id, b]));
   const out: string[] = [];
   const done = new Set<string>();
   const walk = (bundleId: string, trail: string[]): void => {
     const b = byId.get(bundleId);
     if (!b) {
-      problems.push({ where: `bundles/${trail[trail.length - 1] ?? bundleId}.json`, message: `extends называет бандл ${bundleId}, которого нет` });
+      problems.push({ where: byId.get(trail[trail.length - 1] ?? '')?.rel ?? 'bundles/planned.json', message: `extends называет бандл ${bundleId}, которого нет` });
       return;
     }
     if (trail.includes(bundleId)) {
-      problems.push({ where: b.rel, message: `цикл в extends: ${[...trail, bundleId].join(' -> ')}` });
+      problems.push({ where: b.rel ?? 'bundles/planned.json', message: `цикл в extends: ${[...trail, bundleId].join(' -> ')}` });
       return;
     }
     if (done.has(bundleId)) return;
@@ -129,23 +143,29 @@ export function resolveBundle(id: string, bundles: readonly Bundle[], problems: 
   return out;
 }
 
+/** Контракты плагина: то, что нужно для проверки полноты; настоящий манифест и проектное описание приводятся к этому виду. */
+export interface ContractView {
+  provides?: Record<string, unknown>;
+  requires?: Record<string, unknown>;
+  optional?: Record<string, unknown>;
+}
+
 /**
- * Полнота набора: каждый плагин есть в каталоге, и у каждого `requires` есть поставщик нужной версии среди плагинов набора.
+ * Полнота набора: каждый плагин известен, и у каждого `requires` есть поставщик нужной мажорной версии среди плагинов набора.
  * Необязательное (`optional`, `consumes`) не требуется, но отсутствие поставщика `optional` попадает в notes.
  */
-export function checkClosure(bundleId: string, rel: string, ids: readonly string[], catalog: Catalog, problems: Problem[]): { notes: string[] } {
-  const byId = new Map(catalog.plugins.map((p) => [p.id, p]));
-  const members: PluginEntry[] = [];
+export function closureProblems(bundleId: string, rel: string, ids: readonly string[], viewOf: (id: string) => ContractView | undefined, problems: Problem[], what = 'каталоге'): { notes: string[] } {
+  const members: { id: string; view: ContractView }[] = [];
   for (const id of ids) {
-    const p = byId.get(id);
-    if (!p) problems.push({ where: rel, message: `плагина ${id} нет в каталоге` });
-    else members.push(p);
+    const view = viewOf(id);
+    if (!view) problems.push({ where: rel, message: `плагина ${id} нет в ${what}` });
+    else members.push({ id, view });
   }
   const providers = new Map<string, { plugin: string; versions: string[] }[]>();
-  for (const p of members) {
-    for (const [contract, value] of Object.entries(p.manifest.provides ?? {})) {
+  for (const m of members) {
+    for (const [contract, value] of Object.entries(m.view.provides ?? {})) {
       const list = providers.get(contract) ?? [];
-      list.push({ plugin: p.id, versions: providedVersions(value) });
+      list.push({ plugin: m.id, versions: providedVersions(value) });
       providers.set(contract, list);
     }
   }
@@ -153,16 +173,22 @@ export function checkClosure(bundleId: string, rel: string, ids: readonly string
     (providers.get(contract) ?? []).filter((x) => x.versions.some((v) => rangeAccepts(range, v))).map((x) => x.plugin);
 
   const notes: string[] = [];
-  for (const p of members) {
-    for (const [contract, range] of Object.entries(p.manifest.requires ?? {})) {
+  for (const m of members) {
+    for (const [contract, range] of Object.entries(m.view.requires ?? {})) {
       if (typeof range !== 'string') continue;
       const found = supplied(contract, range);
-      if (found.length === 0) problems.push({ where: rel, message: `бандл ${bundleId}: плагин ${p.id} требует ${contract} ${range}, поставщика в бандле нет` });
+      if (found.length === 0) problems.push({ where: rel, message: `бандл ${bundleId}: плагин ${m.id} требует ${contract} ${range}, поставщика в бандле нет` });
       if (found.length > 1) problems.push({ where: rel, message: `бандл ${bundleId}: ${contract} ${range} даёт несколько плагинов (${found.join(', ')}), а requires берёт одного` });
     }
-    for (const [contract, range] of Object.entries(p.manifest.optional ?? {})) {
-      if (typeof range === 'string' && supplied(contract, range).length === 0) notes.push(`${p.id}: необязательный ${contract} ${range} без поставщика`);
+    for (const [contract, range] of Object.entries(m.view.optional ?? {})) {
+      if (typeof range === 'string' && supplied(contract, range).length === 0) notes.push(`${m.id}: необязательный ${contract} ${range} без поставщика`);
     }
   }
   return { notes };
+}
+
+/** Полнота набора по каталогу готовых плагинов. */
+export function checkClosure(bundleId: string, rel: string, ids: readonly string[], catalog: Catalog, problems: Problem[]): { notes: string[] } {
+  const byId = new Map(catalog.plugins.map((p) => [p.id, p]));
+  return closureProblems(bundleId, rel, ids, (id) => byId.get(id)?.manifest, problems);
 }

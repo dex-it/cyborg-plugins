@@ -27,18 +27,21 @@ sidebar:
 Проекты, дерево файлов, просмотр, git и поиск рядом с сессией.
 
 - Идентификатор: `code-workspace`
-- Плагины (5): `projects`, `files`, `viewer`, `git`, `search`
+- Включает бандлы: `agent-sessions`
+- Плагины (9): `projects`, `agent-claude-code`, `sessions`, `session-isolation`, `session-notifications`, `files`, `viewer`, `git`, `search`
 
 ### Задачи и MR
 
 Задачи и MR из GitHub, GitLab и Jira, карточка «Статус».
 
 - Идентификатор: `task-trackers`
-- Плагины (1): `trackers`
+- Включает бандлы: `code-workspace`
+- Плагины (10): `projects`, `agent-claude-code`, `sessions`, `session-isolation`, `session-notifications`, `files`, `viewer`, `git`, `search`, `trackers`
 
 ### AI Cyborg
 
 Всё, что умеет приложение ai-cyborg, но на ядре и плагинах: первая проверка на пригодность всей схемы.
 
 - Идентификатор: `ai-cyborg`
-- Плагины (14): `agent-claude-code`, `sessions`, `remote-sessions`, `session-isolation`, `session-notifications`, `next-actions`, `projects`, `files`, `viewer`, `git`, `search`, `trackers`, `claude-extensions`, `command-buttons`
+- Включает бандлы: `task-trackers`
+- Плагины (14): `projects`, `agent-claude-code`, `sessions`, `session-isolation`, `session-notifications`, `files`, `viewer`, `git`, `search`, `trackers`, `remote-sessions`, `next-actions`, `claude-extensions`, `command-buttons`
