@@ -62,7 +62,7 @@
 | Категория | Что в ней | Запланировано |
 |---|---|---|
 | [`agents`](plugins/) | Движки агентов: чем запускается сессия, как читается её история | `agent-claude-code`, `agent-shell` |
-| [`sessions`](plugins/) | Вкладки, терминал, делегирование, изоляция, уведомления | `sessions`, `session-isolation`, `session-notifications`, `next-actions` |
+| [`sessions`](plugins/) | Вкладки, терминал, делегирование, изоляция, уведомления | `sessions`, `remote-sessions`, `session-isolation`, `session-notifications`, `next-actions` |
 | [`code`](plugins/) | Проекты, дерево файлов, просмотр, git, поиск | `projects`, `files`, `viewer`, `git`, `search` |
 | [`trackers`](plugins/) | Задачи, MR и статус из GitHub, GitLab, Jira | `trackers`, `trackers-http` |
 | [`extensions`](plugins/) | Магазины плагинов Claude Code, скиллы, серверы MCP | `claude-extensions` |
@@ -179,8 +179,9 @@ npm test                   # тесты скриптов и плагинов
 npm run bundle -- --all    # собрать все бандлы (dist/bundles)
 npm run new -- <категория> <id>   # новый плагин из шаблона
 npm run docs:catalog       # страницы каталога для сайта
+npm run sync-labels        # метки GitHub по .github/labels.json
 ```
 
 Код: `plugins/` - плагины по категориям, `bundles/` - бандлы, `templates/plugin/` - шаблон, `scripts/` - проверки и сборка (TypeScript на Node 24 без сборки), `docs/guide/` - страницы сайта, `site/` - сборка сайта (Astro и Starlight).
 
-Каждый PR и пуш в `master` проверяет GitHub Actions на macOS и Linux ([`ci.yml`](.github/workflows/ci.yml)): сборка ядра, проверки, типы, тесты, сверка страниц каталога и сборка бандлов. Сайт собирается и публикуется отдельным workflow ([`docs-site.yml`](.github/workflows/docs-site.yml)), бандлы выходят релизом по тегу `v<версия>` ([`release.yml`](.github/workflows/release.yml)). Правила для задач и PR - на странице [«Разработка»](docs/guide/development/index.md), правила для ИИ-агентов - в [`CLAUDE.md`](CLAUDE.md).
+Каждый PR и пуш в `master` проверяет GitHub Actions на macOS и Linux ([`ci.yml`](.github/workflows/ci.yml)): сборка ядра, проверки, типы, тесты, сверка страниц каталога и сборка бандлов. Сайт собирается и публикуется отдельным workflow ([`docs-site.yml`](.github/workflows/docs-site.yml)), бандлы выходят релизом по тегу `v<версия>` ([`release.yml`](.github/workflows/release.yml)). Задачи, ключи и метки ведутся как в ядре: [«Задачи, метки и ключи»](docs/guide/development/labels.md), правила для ИИ-агентов - в [`CLAUDE.md`](CLAUDE.md).

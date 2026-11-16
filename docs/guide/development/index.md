@@ -6,6 +6,7 @@ description: "Как устроена разработка репозитори�
 | Страница | О чём |
 |---|---|
 | [Карта переноса](/development/roadmap/) | Что из ai-cyborg в какой плагин, бандл и в каком порядке переезжает |
+| [Задачи, метки и ключи](/development/labels/) | Уровни задач, ключи в названиях, группы меток, этапы, файл `labels.json` |
 | [CI и релизы](/development/ci/) | Что проверяет каждый pull request, как выходят бандлы |
 | [Что нужно от ядра](/development/harness/) | Зависимости от Cyborg Harness и предложения ядру |
 | [Сайт документации](/development/docs-site/) | Как собирается и публикуется этот сайт |
@@ -32,5 +33,5 @@ npm run check && npm run check:plugins && npm run typecheck && npm test
 
 1. Ветка от `master` с коротким именем по сути.
 2. Изменение вместе с тестом и правкой документации: страницы лежат в `docs/guide/`.
-3. `npm run check && npm run check:plugins && npm run typecheck && npm test`; если менялись плагины или бандлы - `npm run docs:catalog`.
+3. `npm run check && npm run check:plugins && npm run typecheck && npm test`; если менялись плагины или бандлы - `npm run docs:catalog`; если менялись метки - `npm run sync-labels`.
 4. Pull request в `master`; слияние после зелёного CI.
