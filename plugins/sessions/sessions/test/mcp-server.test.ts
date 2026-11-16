@@ -1,12 +1,11 @@
 // Сервер MCP сессий на настоящем ядре (фича 15, M-04): `agent-claude-code` пишет конфиг и отдаёт токен процессу, `sessions` держит сервер по праву `serve`.
 // Терминал - `fakePty()`, хуки Claude Code изображает запись строки JSON в файл событий. Настоящего `claude` в тестах нет: клиент MCP тесты играют сами по конфигу запуска.
 import assert from 'node:assert/strict';
-import { access, cp, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { access, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { test } from 'node:test';
 import { PARALLEL_PROMPT } from '../delegate.ts';
-import { claudeArgs, PLUGIN_DIR, rig, settle, until, type Proc, type Rig } from './kit.ts';
+import { claudeArgs, rig, settle, until, type Proc, type Rig } from './kit.ts';
 import { echoTool, mcpOf, textsUnder, type Mcp } from './mcp-kit.ts';
 
 const exists = (file: string): Promise<boolean> => access(file).then(() => true, () => false);
@@ -453,25 +452,20 @@ test('дочерняя запоминается в перечне разгово
   assert.deepEqual(await r.run('sessions.children'), [uuid], 'разговор самостоятельной сессии в перечень не идёт');
 });
 
-test('вид получает сообщения о поручении и закрытии: без задания и без ключа', async () => {
-  const copy = await mkdtemp(path.join(tmpdir(), 'cyborg-sessions-view-'));
-  try {
-    await cp(PLUGIN_DIR, copy, { recursive: true, filter: (src) => !src.includes('node_modules') });
-    const manifest = JSON.parse(await readFile(path.join(copy, 'manifest.json'), 'utf8'));
-    manifest.ui = { views: { main: { module: './ui/ui.js', area: 'main', order: 100 } } };
-    await writeFile(path.join(copy, 'manifest.json'), JSON.stringify(manifest));
-    const sent: unknown[] = [];
-    await using r = await rig({ pluginDir: copy, load: { onViewMessage: (_plugin, _view, message) => void sent.push(message) } });
-    const parent = await human(r);
-    const secret = 'ЗАДАНИЕ-ДЛЯ-ВИДА-91c2';
-    await parent.mcp.tool('open_session', { prompt: secret, repo: r.repoA });
-    await until('сообщение о поручении', () => sent.length > 0);
-    assert.deepEqual(sent, [{ type: 'session:handoff', from: 1, sessionId: (await r.run('sessions.family') as { sessionId: string }[])[1]?.sessionId, number: 2 }]);
-    await parent.mcp.tool('close_session', { id: 2 });
-    await until('сообщение о закрытии', () => sent.length > 1);
-    assert.equal((sent[1] as { type: string }).type, 'session:close');
-    assert.ok(!JSON.stringify(sent).includes(secret));
-  } finally {
-    await rm(copy, { recursive: true, force: true });
-  }
+test('вид получает сообщения о поручении и закрытии: без задания и без ключа, и перечитывает вкладки', async () => {
+  const sent: { type?: string }[] = [];
+  await using r = await rig({ load: { onViewMessage: (plugin, view, message) => void (plugin === 'sessions' && view === 'main' && sent.push(message as { type?: string })) } });
+  const parent = await human(r);
+  const secret = 'ЗАДАНИЕ-ДЛЯ-ВИДА-91c2';
+  await parent.mcp.tool('open_session', { prompt: secret, repo: r.repoA });
+  const childId = ((await r.run('sessions.family')) as { sessionId: string }[])[1]?.sessionId;
+  await until('сообщение о поручении', () => sent.some((m) => m.type === 'session:handoff'));
+  assert.deepEqual(sent.find((m) => m.type === 'session:handoff'), { type: 'session:handoff', from: 1, sessionId: childId, number: 2 });
+  const tabsBefore = sent.filter((m) => m.type === 'tabs').length;
+  await parent.mcp.tool('close_session', { id: 2 });
+  await until('сообщение о закрытии', () => sent.some((m) => m.type === 'session:close'));
+  assert.deepEqual(sent.find((m) => m.type === 'session:close'), { type: 'session:close', sessionId: childId, number: 2 });
+  await until('толчок перечитать вкладки', () => sent.filter((m) => m.type === 'tabs').length > tabsBefore);
+  assert.ok(!JSON.stringify(sent).includes(secret), 'задание виду не уходит');
+  assert.ok(!JSON.stringify(sent).includes(parent.mcp.token), 'токен виду не уходит');
 });

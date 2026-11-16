@@ -5,6 +5,8 @@ import { createDelegate } from './delegate.ts';
 import { createInput } from './input.ts';
 import { createLauncher } from './launcher.ts';
 import { Registry } from './registry.ts';
+import { createBridge } from './view-bridge.ts';
+import { keepWindowTitle } from './window-title.ts';
 
 export { CHANNELS } from './commands.ts';
 
@@ -21,10 +23,12 @@ const plugin: PluginModule = {
     const launcher = createLauncher(ctx, pty, registry, delegate.hooks);
     delegate.bind(launcher);
     const input = createInput(registry);
-    ctx.contracts.provide('cyborg.sessions', CONTRACT_VERSION, createContract(ctx, registry, launcher, input));
-    registerCommands(ctx, registry, launcher, input);
+    const bridge = createBridge(ctx, registry, launcher);
+    ctx.contracts.provide('cyborg.sessions', CONTRACT_VERSION, bridge.decorate(createContract(ctx, registry, launcher, input)));
+    registerCommands(ctx, registry, launcher, input, bridge.opened);
     delegate.registerCommands();
     await delegate.start();
+    keepWindowTitle(ctx, bridge.projectChanged);
     // Человек закрыл вкладку в окне: сессии за ней больше не на что показываться, процесс завершается, метки уходят.
     ctx.documents.onClose((doc) => {
       const tab = registry.byDoc(doc);
@@ -32,6 +36,7 @@ const plugin: PluginModule = {
       registry.remove(tab.sessionId);
       delegate.forget(tab.sessionId);
       void tab.handle?.kill().catch(() => undefined);
+      bridge.nudge();
     });
     await launcher.adopt().catch((error: unknown) => ctx.log(`подхват оставленных сессий: ${String(error)}`, 'warn'));
     const kept = await ctx.documents.list();

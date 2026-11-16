@@ -44,12 +44,22 @@ export interface ProjectsFake {
   readonly plugin: InlinePlugin;
   /** Репозитории, которые отдаёт `list`; тест меняет их по ходу. */
   repos: string[];
+  /** Название выбранного проекта; `null` - проект не выбран (по умолчанию выбран «Проект»). */
+  selectedName: string | null;
+  /** Выбрать проект или снять выбор: подписчики `onChange` получают событие. */
+  select(name: string | null): void;
 }
 
 /** Подставной поставщик `cyborg.projects` (настоящий - плагин `projects`, его проверяет отдельный тест): один проект с заданными репозиториями. */
 export function fakeProjects(initial: readonly string[]): ProjectsFake {
+  const listeners = new Set<(change: { type: 'selected'; projectId: string | null }) => void>();
   const state: ProjectsFake = {
     repos: [...initial],
+    selectedName: 'Проект',
+    select(name) {
+      state.selectedName = name;
+      for (const listener of listeners) listener({ type: 'selected', projectId: name === null ? null : 'p1' });
+    },
     plugin: {
       manifest: { id: 'fake-projects', version: '1.0.0', engines: { cyborg: '^1' }, provides: { 'cyborg.projects': '1.0' }, permissions: { 'security.roots': true } },
       module: {
@@ -58,10 +68,13 @@ export function fakeProjects(initial: readonly string[]): ProjectsFake {
           await ctx.os.security?.setRoots(state.repos);
           ctx.contracts.provide('cyborg.projects', '1.0', {
             list: async () => [{ id: 'p1', name: 'Проект', description: '', repos: [...state.repos] }],
-            selected: async () => null,
-            hasSelected: async () => false,
+            selected: async () => (state.selectedName === null ? null : { id: 'p1', name: state.selectedName, description: '', repos: [...state.repos] }),
+            hasSelected: async () => state.selectedName !== null,
             roots: async () => [],
-            onChange: () => ({ dispose() {} }),
+            onChange: (listener) => {
+              listeners.add(listener);
+              return { dispose: () => void listeners.delete(listener) };
+            },
           });
           return undefined;
         },
@@ -114,6 +127,9 @@ export interface Rig extends AsyncDisposable {
   clean(): void;
   /** Запись журнала плагина `sessions` (`ctx.log`). */
   readonly logs: string[];
+  /** Сообщения главной части видам своего плагина по каналу: вид подписывается `onView`, как `ctx.channel.onMessage`. */
+  readonly sent: { readonly view: string; readonly message: unknown }[];
+  onView(view: string, listener: (message: unknown) => void): { dispose(): void };
   /** Журналы Claude Code: `<home>/.claude/projects`. */
   journalDir(repo: string): string;
 }
@@ -178,6 +194,8 @@ export async function rig(options: RigOptions = {}): Promise<Rig> {
   const projects = fakeProjects([repoA, repoB]);
   const events: SessionEvent[] = [];
   const logs: string[] = [];
+  const sent: { view: string; message: unknown }[] = [];
+  const viewListeners = new Set<{ view: string; listener: (message: unknown) => void }>();
   let probe: PluginContext | undefined;
   const probePlugin: InlinePlugin = {
     manifest: { id: 'probe', version: '1.0.0', engines: { cyborg: '^1' }, requires: { 'cyborg.sessions': '^1' } },
@@ -199,7 +217,15 @@ export async function rig(options: RigOptions = {}): Promise<Rig> {
       ...options.os,
     },
     ...(options.state && { state: options.state }),
-    load: { onLog: (pluginId, message) => void (pluginId === 'sessions' && logs.push(message)), ...options.load },
+    load: {
+      onLog: (pluginId, message) => void (pluginId === 'sessions' && logs.push(message)),
+      onViewMessage: (pluginId, view, message) => {
+        if (pluginId !== 'sessions') return;
+        sent.push({ view, message });
+        for (const l of [...viewListeners]) if (l.view === view) l.listener(message);
+      },
+      ...options.load,
+    },
   });
   const failed = (): unknown[] => kernel.journal.filter((e) => e.kind === 'failed' || e.kind === 'invalid' || e.kind === 'rejected' || e.kind === 'denied');
   await kernel.waitForJournal({ kind: 'activated', pluginId: 'sessions' });
@@ -248,6 +274,12 @@ export async function rig(options: RigOptions = {}): Promise<Rig> {
       assert.deepEqual(failed(), []);
     },
     logs,
+    sent,
+    onView(view, listener) {
+      const entry = { view, listener };
+      viewListeners.add(entry);
+      return { dispose: () => void viewListeners.delete(entry) };
+    },
     journalDir: (repo) => path.join(home, '.claude', 'projects', projectDirName(repo)),
     [Symbol.asyncDispose]: async () => {
       await kernel[Symbol.asyncDispose]();

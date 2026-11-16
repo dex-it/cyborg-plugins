@@ -51,6 +51,7 @@ export function createDelegate(ctx: PluginContext, registry: Registry): Delegate
     delegation.forget(tab.sessionId);
     await ctx.documents.close(tab.doc).catch((error: unknown) => ctx.log(`${tab.title}: документ не закрыт - ${String(error)}`, 'warn'));
     await tab.handle?.kill().catch(() => undefined);
+    announce({ type: 'tabs' });
   };
   const delegation: Delegation = new Delegation({
     registry,
@@ -86,6 +87,8 @@ export function createDelegate(ctx: PluginContext, registry: Registry): Delegate
       const number = delegation.numberOf(opened.sessionId);
       if (number === undefined) throw new Error('вкладка открыта, но уже закрыта');
       announce({ type: 'session:handoff', from: request.from, sessionId: opened.sessionId, number });
+      // Вкладку открыл не вид: толчок `tabs` заставляет его перечитать вкладки (view-bridge.ts).
+      announce({ type: 'tabs' });
       entry.resolve(number);
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
