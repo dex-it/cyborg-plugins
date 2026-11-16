@@ -5,13 +5,20 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { test } from 'node:test';
 import { collectFragments } from '../prompt.ts';
+import { PARALLEL_PROMPT } from '../delegate.ts';
 import { ISOLATION_DIR, promptProvider, rig } from './kit.ts';
 
 const isolation = (await readFile(path.join(ISOLATION_DIR, 'test', 'fixtures', 'isolation-prompt.txt'), 'utf8')).replace(/\n$/, '');
 const KNOPKI = 'КНОПКИ СЛЕДУЮЩИХ ШАГОВ';
 
-/** Значение `--append-system-prompt` из аргументов запуска. */
-const systemPrompt = (args: readonly string[]): string | undefined => args[args.indexOf('--append-system-prompt') + 1];
+/**
+ * Значение `--append-system-prompt` из аргументов запуска без повода к делегированию: его sessions дописывает последним (M-04), порядок поставщиков он не меняет.
+ * Что повод есть и стоит последним, проверяет mcp-server.test.ts.
+ */
+const systemPrompt = (args: readonly string[]): string | undefined => {
+  const text = args[args.indexOf('--append-system-prompt') + 1];
+  return text === PARALLEL_PROMPT ? '' : text?.replace(`\n\n${PARALLEL_PROMPT}`, '');
+};
 
 test('в каждой сессии есть инструкция изоляции дословно (FR-9001, FR-9003): её передаёт sessions, worktree он не создаёт', async () => {
   await using r = await rig();
@@ -39,7 +46,7 @@ test('порядок не зависит от порядка загрузки п
 test('пустой вклад и вклад из пробелов отбрасываются; без поставщиков промпта флага нет', async () => {
   await using r = await rig({ noIsolation: true, extra: [promptProvider('a-empty', ''), promptProvider('b-blank', '  \n ')] });
   await r.sessions.create({ cwd: r.repoA });
-  assert.ok(!r.last().args.includes('--append-system-prompt'));
+  assert.equal(systemPrompt(r.last().args), '', 'остался один повод к делегированию, фрагментов поставщиков нет');
   await using only = await rig({ noIsolation: true, extra: [promptProvider('a-empty', ''), promptProvider('c-real', 'ТЕКСТ')] });
   await only.sessions.create({ cwd: only.repoA });
   assert.equal(systemPrompt(only.last().args), 'ТЕКСТ');

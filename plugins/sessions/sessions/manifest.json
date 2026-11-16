@@ -16,11 +16,16 @@
     "sessions.previous": {},
     "sessions.running": {},
     "sessions.reopen": { "args": ["string"] },
-    "sessions.restore": { "args": ["string"] }
+    "sessions.restore": { "args": ["string"] },
+    "sessions.family": {},
+    "sessions.children": {},
+    "sessions.actions": { "args": ["string"] }
   },
   "documents": { "session": { "restorable": true, "area": "main", "order": 100 } },
   "permissions": {
     "fs.read": ["workspace"],
+    "serve": true,
+    "notify": true,
     "pty": [
       {
         "program": "$SHELL",

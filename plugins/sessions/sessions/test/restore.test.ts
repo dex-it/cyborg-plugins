@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { memoryStore } from '@cyborg-harness/testing';
-import { prepare, rig, settle, until, UUID_A, UUID_B } from './kit.ts';
+import { claudeArgs, prepare, rig, settle, until, UUID_A, UUID_B } from './kit.ts';
 
 interface Opened {
   sessionId: string;
@@ -41,7 +41,7 @@ test('восстановление вручную: вышедшая сессия
   assert.equal(second.title, first.title, 'заголовок вкладки прежний');
   assert.notEqual(second.sessionId, first.sessionId);
   const restored = r.last();
-  assert.deepEqual(restored.args.slice(3, 5), ['--resume', UUID_A]);
+  assert.deepEqual(claudeArgs(restored).slice(0, 2), ['--resume', UUID_A]);
   assert.equal(restored.options.cwd, r.repoA);
   assert.deepEqual(restored.args.slice(-2), ['--add-dir', r.repoB], 'каталоги запуска те же');
   assert.deepEqual(await r.run('sessions.previous'), []);
@@ -68,7 +68,7 @@ test('восстановление: новый разговор агента з�
   proc.exit(0);
   await until('выход', () => r.events.some((e) => e.change.type === 'exit'));
   await r.run('sessions.restore', doc.id);
-  assert.deepEqual(r.last().args.slice(3, 5), ['--resume', UUID_B], 'после /clear продолжается последний разговор');
+  assert.deepEqual(claudeArgs(r.last()).slice(0, 2), ['--resume', UUID_B], 'после /clear продолжается последний разговор');
   await assert.rejects(r.run('sessions.restore', 'нет-такой'), /документа нет-такой нет/);
 
   // Сессия, у которой агент не дошёл до SessionStart: id продолжения нет, вкладка запускает новую сессию.

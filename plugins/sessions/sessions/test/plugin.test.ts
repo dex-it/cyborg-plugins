@@ -18,7 +18,7 @@ describe('плагин sessions', () => {
   it('проверка состава: манифест, файлы, правило импортов - без замечаний; права названы словами', async () => {
     const report = await checkPlugin(PLUGIN_DIR, { ignore: ['dist'], declarationPackages: ['@cyborg-plugins/contracts'] });
     assert.deepEqual(report.problems, []);
-    assert.equal(report.permissions.length, 2, report.permissions.join('; '));
+    assert.equal(report.permissions.length, 4, report.permissions.join('; '));
     assert.ok(report.permissions.some((p) => p.includes('запрещены флаги') && p.includes('--dangerously-skip-permissions')), report.permissions.join('; '));
   });
 
