@@ -1,0 +1,16 @@
+{
+  "type": "object",
+  "properties": {
+    "hosts": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "maxItems": 32
+      }
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,2320 @@
+"use strict";
+var __create = Object.create;
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+
+// companions/agentd/src/agentd/agentd.ts
+var agentd_exports = {};
+__export(agentd_exports, {
+  groupOwned: () => groupOwned,
+  lineReader: () => lineReader,
+  lockHolderAlive: () => lockHolderAlive
+});
+module.exports = __toCommonJS(agentd_exports);
+var import_node_child_process4 = require("node:child_process");
+var import_node_fs7 = __toESM(require("node:fs"), 1);
+var import_node_net3 = __toESM(require("node:net"), 1);
+var import_node_os = __toESM(require("node:os"), 1);
+var import_node_path7 = __toESM(require("node:path"), 1);
+
+// companions/agentd/src/agentd/daemon.ts
+var import_node_fs6 = __toESM(require("node:fs"), 1);
+var import_node_net2 = __toESM(require("node:net"), 1);
+var import_node_path6 = __toESM(require("node:path"), 1);
+var import_node_string_decoder = require("node:string_decoder");
+
+// companions/agentd/src/shared/shell-quote.ts
+function shQuote(text) {
+  return `'${text.replaceAll("'", "'\\''")}'`;
+}
+
+// companions/agentd/src/agentd/protocol.ts
+var PROTO = 2;
+var RING_BYTES = 1024 * 1024;
+var EVENTS_TAIL_BYTES = 1024 * 1024;
+var MAX_FILE_BYTES = 5 * 1024 * 1024;
+var SLEEP_IDLE_MS = 2 * 36e5;
+var DEFAULT_LIMITS = { maxPerHost: 4, taskMs: 4 * 36e5, idleMs: 30 * 6e4 };
+
+// companions/agentd/src/main/commands.ts
+var LABEL_MAX = 40;
+
+// companions/agentd/src/main/suggestions.ts
+var SUGGEST_MAX = 2;
+var MARKER = "<!-- cyborg-buttons:";
+var END = "-->";
+var SUGGEST_PROMPT = `\u0415\u0441\u043B\u0438 \u043F\u043E\u0441\u043B\u0435 \u043E\u0442\u0432\u0435\u0442\u0430 \u0447\u0435\u043B\u043E\u0432\u0435\u043A\u0443 \u043F\u043E\u043D\u044F\u0442\u043D\u044B 1-${SUGGEST_MAX} \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0438\u0445 \u0448\u0430\u0433\u0430, \u0434\u043E\u043F\u0438\u0448\u0438 \u0432 \u0441\u0430\u043C\u043E\u043C \u043A\u043E\u043D\u0446\u0435 \u043E\u0442\u0432\u0435\u0442\u0430, \u043E\u0442\u0434\u0435\u043B\u044C\u043D\u043E\u0439 \u0441\u0442\u0440\u043E\u043A\u043E\u0439, \u043A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0439 ${MARKER} [{"label":"\u043F\u043E\u0434\u043F\u0438\u0441\u044C \u0434\u043E ${LABEL_MAX} \u0437\u043D\u0430\u043A\u043E\u0432","text":"\u0440\u0435\u043F\u043B\u0438\u043A\u0430 \u0447\u0435\u043B\u043E\u0432\u0435\u043A\u0430 \u043A \u0442\u0435\u0431\u0435, \u043E\u0434\u043D\u043E\u0439 \u0441\u0442\u0440\u043E\u043A\u043E\u0439"}] ${END} . "submit":true \u0434\u043E\u0431\u0430\u0432\u043B\u044F\u0439, \u0442\u043E\u043B\u044C\u043A\u043E \u0435\u0441\u043B\u0438 \u0440\u0435\u043F\u043B\u0438\u043A\u0443 \u043C\u043E\u0436\u043D\u043E \u043E\u0442\u043F\u0440\u0430\u0432\u0438\u0442\u044C \u0431\u0435\u0437 \u043F\u0440\u0430\u0432\u043A\u0438; \u0438\u043D\u0430\u0447\u0435 \u043F\u043E\u043B\u0435 \u043D\u0435 \u043F\u0438\u0448\u0438, \u0438 \u0447\u0435\u043B\u043E\u0432\u0435\u043A \u0434\u043E\u043F\u0438\u0448\u0435\u0442 \u0440\u0435\u043F\u043B\u0438\u043A\u0443 \u0441\u0430\u043C. \u0420\u0435\u043F\u043B\u0438\u043A\u0430 \u043D\u0435 \u043D\u0430\u0447\u0438\u043D\u0430\u0435\u0442\u0441\u044F \u0441 \xAB!\xBB. \u041D\u0435 \u043E\u0447\u0435\u0432\u0438\u0434\u043D\u043E, \u0447\u0442\u043E \u0434\u0435\u043B\u0430\u0442\u044C \u0434\u0430\u043B\u044C\u0448\u0435, - \u043D\u0435 \u043F\u0438\u0448\u0438 \u043D\u0438\u0447\u0435\u0433\u043E. \u0412 \u0442\u0435\u043A\u0441\u0442\u0435 \u043E\u0442\u0432\u0435\u0442\u0430 \u043A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0439 \u043D\u0435 \u0443\u043F\u043E\u043C\u0438\u043D\u0430\u0439.`;
+function withoutSuggestions(message) {
+  const trimmed = message.trimEnd();
+  const start = trimmed.endsWith(END) ? trimmed.lastIndexOf(MARKER) : -1;
+  return start < 0 ? message : trimmed.slice(0, start).trimEnd();
+}
+
+// companions/agentd/src/main/claude-args.ts
+var ISOLATION_PROMPT = "\u0412 \u044D\u0442\u0438\u0445 \u0440\u0435\u043F\u043E\u0437\u0438\u0442\u043E\u0440\u0438\u044F\u0445 \u043F\u0430\u0440\u0430\u043B\u043B\u0435\u043B\u044C\u043D\u043E \u0440\u0430\u0431\u043E\u0442\u0430\u044E\u0442 \u0434\u0440\u0443\u0433\u0438\u0435 \u0441\u0435\u0441\u0441\u0438\u0438. \u041F\u0435\u0440\u0435\u0434 \u043F\u0435\u0440\u0432\u043E\u0439 \u043F\u0440\u0430\u0432\u043A\u043E\u0439 \u0432 \u0440\u0435\u043F\u043E\u0437\u0438\u0442\u043E\u0440\u0438\u0438, \u0441\u043C\u0435\u043D\u043E\u0439 \u0432\u0435\u0442\u043A\u0438 \u0438\u043B\u0438 \u043A\u043E\u043C\u043C\u0438\u0442\u043E\u043C - EnterWorktree, \u0434\u0430\u043B\u044C\u0448\u0435 \u0440\u0430\u0431\u043E\u0442\u0430 \u0442\u043E\u043B\u044C\u043A\u043E \u0432 \u043D\u0451\u043C; \u043E\u0441\u043D\u043E\u0432\u043D\u043E\u0439 \u043A\u0430\u0442\u0430\u043B\u043E\u0433 - \u0442\u043E\u043B\u044C\u043A\u043E \u0447\u0442\u0435\u043D\u0438\u0435. \u0424\u0430\u0439\u043B\u044B \u0432\u043D\u0435 \u0440\u0435\u043F\u043E\u0437\u0438\u0442\u043E\u0440\u0438\u0435\u0432 (\u0441\u043A\u0440\u044D\u0442\u0447\u043F\u0430\u0434, \u0432\u0440\u0435\u043C\u0435\u043D\u043D\u044B\u0435) worktree \u043D\u0435 \u0442\u0440\u0435\u0431\u0443\u044E\u0442. EnterWorktree \u0438\u0437\u043E\u043B\u0438\u0440\u0443\u0435\u0442 \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u0435\u043F\u043E\u0437\u0438\u0442\u043E\u0440\u0438\u0439 \u0440\u0430\u0431\u043E\u0447\u0435\u0433\u043E \u043A\u0430\u0442\u0430\u043B\u043E\u0433\u0430: \u043F\u0435\u0440\u0435\u0434 \u043F\u0440\u0430\u0432\u043A\u043E\u0439 \u0432 \u0440\u0435\u043F\u043E\u0437\u0438\u0442\u043E\u0440\u0438\u0438 \u0438\u0437 --add-dir - git worktree add <\u0440\u0435\u043F\u043E\u0437\u0438\u0442\u043E\u0440\u0438\u0439>/.claude/worktrees/<\u0442\u043E \u0436\u0435 \u0438\u043C\u044F> -b <\u0442\u0430 \u0436\u0435 \u0432\u0435\u0442\u043A\u0430>, \u0438 \u043F\u0440\u0430\u0432\u043A\u0438 \u0442\u043E\u043B\u044C\u043A\u043E \u043F\u043E \u044D\u0442\u043E\u043C\u0443 \u043F\u0443\u0442\u0438.";
+var SESSION_PROMPT = `${ISOLATION_PROMPT}
+
+${SUGGEST_PROMPT}`;
+var PARALLEL_SKILL = "cyborg:parallel-sessions";
+var PARALLEL_PROMPT = `Cyborg \u0432\u0435\u0434\u0451\u0442 \u0440\u0430\u0431\u043E\u0442\u0443 \u0432 \u043F\u0430\u0440\u0430\u043B\u043B\u0435\u043B\u044C\u043D\u044B\u0445 \u0441\u0435\u0441\u0441\u0438\u044F\u0445 - \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u044B\u0445 \u0438 \u0443\u0434\u0430\u043B\u0451\u043D\u043D\u044B\u0445, \u043D\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0430\u0445 \u043F\u043E SSH. \u0417\u0430\u0434\u0430\u0447\u0443, \u043A\u043E\u0442\u043E\u0440\u0430\u044F \u0440\u0430\u0441\u043F\u0430\u0434\u0430\u0435\u0442\u0441\u044F \u043D\u0430 \u043D\u0435\u0437\u0430\u0432\u0438\u0441\u0438\u043C\u044B\u0435 \u0447\u0430\u0441\u0442\u0438, \u043C\u043E\u0436\u043D\u043E \u0434\u0435\u043B\u0435\u0433\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u0434\u0440\u0443\u0433\u0438\u043C \u0441\u0435\u0441\u0441\u0438\u044F\u043C Cyborg: \u0432 \u043F\u0435\u0440\u0432\u044B\u0439 \u0440\u0430\u0437 \u0441\u043F\u0440\u043E\u0441\u0438 \u0447\u0435\u043B\u043E\u0432\u0435\u043A\u0430 \u0438 \u0437\u0430\u043F\u043E\u043C\u043D\u0438 \u0435\u0433\u043E \u0440\u0435\u0448\u0435\u043D\u0438\u0435; \u043A\u0430\u043A \u0434\u0435\u043B\u0435\u0433\u0438\u0440\u043E\u0432\u0430\u0442\u044C, \u0432\u0435\u0441\u0442\u0438 \u0437\u0430\u0434\u0430\u0447\u0443 \u0441\u043E\u0432\u043C\u0435\u0441\u0442\u043D\u043E, \u0440\u0430\u0441\u043F\u0440\u0435\u0434\u0435\u043B\u044F\u0442\u044C \u043D\u0430\u0433\u0440\u0443\u0437\u043A\u0443 \u0438 \u0437\u0430\u043A\u0440\u044B\u0432\u0430\u0442\u044C \u043E\u0442\u0440\u0430\u0431\u043E\u0442\u0430\u0432\u0448\u0438\u0445 - \u0441\u043A\u0438\u043B\u043B ${PARALLEL_SKILL}.`;
+var MCP_SESSION_PROMPT = `${ISOLATION_PROMPT}
+
+${PARALLEL_PROMPT}
+
+${SUGGEST_PROMPT}`;
+var REMOTE_SYSTEM_PROMPT = `${SUGGEST_PROMPT}
+
+\u0422\u044B \u0440\u0430\u0431\u043E\u0442\u0430\u0435\u0448\u044C \u043D\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0435 \u0440\u0430\u0437\u0440\u0430\u0431\u043E\u0442\u0447\u0438\u043A\u0430 \u0432 \u0441\u043E\u0431\u0441\u0442\u0432\u0435\u043D\u043D\u044B\u0445 \u043A\u043B\u043E\u043D\u0430\u0445 \u0440\u0435\u043F\u043E\u0437\u0438\u0442\u043E\u0440\u0438\u0435\u0432. \u0417\u0430\u043A\u043E\u043D\u0447\u0438\u0432, \u0437\u0430\u043F\u0443\u0448\u044C \u0432\u0435\u0442\u043A\u0443 \u0438 \u043E\u0442\u043A\u0440\u043E\u0439 PR, \u0437\u0430\u0442\u0435\u043C \u0432\u044B\u0437\u043E\u0432\u0438 \u0438\u043D\u0441\u0442\u0440\u0443\u043C\u0435\u043D\u0442 report_done: status (ok, failed \u0438\u043B\u0438 blocked), summary - \u0438\u0442\u043E\u0433 \u043E\u0434\u043D\u0438\u043C \u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u0435\u043C, branch \u0438 pr, \u0435\u0441\u043B\u0438 \u0435\u0441\u0442\u044C. \u041F\u043E\u0441\u043B\u0435 \u0438\u0442\u043E\u0433\u0430 \u0441\u0435\u0441\u0441\u0438\u044F \u043E\u0441\u0442\u0430\u0451\u0442\u0441\u044F \u043E\u0442\u043A\u0440\u044B\u0442\u043E\u0439: \u043D\u043E\u0432\u043E\u0435 \u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u0435 - \u043D\u043E\u0432\u044B\u0439 \u043A\u0440\u0443\u0433 \u0440\u0430\u0431\u043E\u0442\u044B \u0441\u043E \u0441\u0432\u043E\u0438\u043C report_done. \u041D\u0435\u0437\u0430\u043F\u0443\u0448\u0435\u043D\u043D\u0430\u044F \u0440\u0430\u0431\u043E\u0442\u0430 \u043F\u0440\u0438 \u0443\u0431\u043E\u0440\u043A\u0435 \u043A\u043B\u043E\u043D\u0430 \u043D\u0435 \u0443\u0434\u0430\u043B\u044F\u0435\u0442\u0441\u044F.`;
+function remoteSystemPrompt(others) {
+  const known = others.filter((o) => !!o.url);
+  if (!known.length) return REMOTE_SYSTEM_PROMPT;
+  const list = known.map((o) => `${o.name}: git clone -- ${shQuote(o.url)} ${shQuote(o.path)}`).join("\n");
+  return `${REMOTE_SYSTEM_PROMPT}
+
+\u0421\u043A\u043B\u043E\u043D\u0438\u0440\u043E\u0432\u0430\u043D \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u0430\u0431\u043E\u0447\u0438\u0439 \u0440\u0435\u043F\u043E\u0437\u0438\u0442\u043E\u0440\u0438\u0439. \u041E\u0441\u0442\u0430\u043B\u044C\u043D\u044B\u0435 \u0440\u0435\u043F\u043E\u0437\u0438\u0442\u043E\u0440\u0438\u0438 \u043F\u0440\u043E\u0435\u043A\u0442\u0430 \u043A\u043B\u043E\u043D\u0438\u0440\u0443\u0439, \u0442\u043E\u043B\u044C\u043A\u043E \u043A\u043E\u0433\u0434\u0430 \u043E\u043D\u0438 \u043F\u043E\u043D\u0430\u0434\u043E\u0431\u044F\u0442\u0441\u044F, \u043A\u043E\u043C\u0430\u043D\u0434\u043E\u0439 \u0438\u0437 \u0441\u043F\u0438\u0441\u043A\u0430; \u043A\u0430\u0442\u0430\u043B\u043E\u0433 \u0443\u0436\u0435 \u0435\u0441\u0442\u044C - \u043A\u043B\u043E\u043D \u0433\u043E\u0442\u043E\u0432. \u0421\u043A\u0438\u043B\u043B\u044B \u0438 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 .claude/ \u0441\u043A\u043B\u043E\u043D\u0438\u0440\u043E\u0432\u0430\u043D\u043D\u043E\u0433\u043E \u0440\u0435\u043F\u043E\u0437\u0438\u0442\u043E\u0440\u0438\u044F \u043F\u043E\u0434\u043A\u043B\u044E\u0447\u0430\u0442\u0441\u044F \u0441\u043E \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0435\u0433\u043E \u0437\u0430\u043F\u0443\u0441\u043A\u0430 \u0441\u0435\u0441\u0441\u0438\u0438:
+${list}`;
+}
+function claudeArgs(addDirs, prompt, resume, systemPrompt = SESSION_PROMPT) {
+  return [
+    ...resume ? ["--resume", resume] : [],
+    "--append-system-prompt",
+    systemPrompt,
+    ...prompt ? [prompt] : [],
+    ...addDirs.length ? ["--add-dir", ...addDirs] : []
+  ];
+}
+
+// companions/agentd/src/main/files.ts
+var import_promises = __toESM(require("node:fs/promises"), 1);
+var import_node_path = __toESM(require("node:path"), 1);
+var MAX_VIEW_BYTES = 5 * 1024 * 1024;
+var MAX_WALK_FILES = 5e4;
+async function listDir(dir) {
+  const entries = await import_promises.default.readdir(dir, { withFileTypes: true });
+  const result = [];
+  for (const entry of entries) {
+    if (entry.name === ".git") continue;
+    let isDir2 = entry.isDirectory();
+    if (entry.isSymbolicLink()) {
+      isDir2 = await import_promises.default.stat(import_node_path.default.join(dir, entry.name)).then((s) => s.isDirectory(), () => false);
+    }
+    result.push({ name: entry.name, isDir: isDir2 });
+  }
+  return result.sort((a, b) => Number(b.isDir) - Number(a.isDir) || a.name.localeCompare(b.name));
+}
+async function walkFiles(root) {
+  const files = [];
+  const queue = [""];
+  while (queue.length && files.length < MAX_WALK_FILES) {
+    const rel = queue.shift();
+    const entries = await import_promises.default.readdir(import_node_path.default.join(root, rel), { withFileTypes: true }).catch(() => []);
+    for (const entry of entries) {
+      if (entry.name === ".git") continue;
+      const child = rel ? `${rel}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) queue.push(child);
+      else files.push(child);
+    }
+  }
+  return files;
+}
+async function readTextFile(file) {
+  try {
+    const stat = await import_promises.default.stat(file);
+    if (stat.size > MAX_VIEW_BYTES) return { error: `\u0424\u0430\u0439\u043B \u0431\u043E\u043B\u044C\u0448\u0435 ${MAX_VIEW_BYTES / 1024 / 1024} \u041C\u0411` };
+    const buffer = await import_promises.default.readFile(file);
+    if (buffer.subarray(0, 8e3).includes(0)) return { error: "\u0414\u0432\u043E\u0438\u0447\u043D\u044B\u0439 \u0444\u0430\u0439\u043B" };
+    return { content: buffer.toString("utf8") };
+  } catch (error) {
+    return { error: error.message };
+  }
+}
+
+// companions/agentd/src/main/git.ts
+var import_node_child_process = require("node:child_process");
+var import_node_fs = __toESM(require("node:fs"), 1);
+var import_node_path2 = __toESM(require("node:path"), 1);
+var SAFE_CONFIG = ["-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null"];
+function gitRaw(cwd, args, env) {
+  return new Promise((resolve, reject) => {
+    (0, import_node_child_process.execFile)(
+      "git",
+      [...SAFE_CONFIG, "-C", cwd, ...args],
+      { maxBuffer: 64 * 1024 * 1024, encoding: "buffer", env: env ? { ...process.env, ...env } : process.env },
+      (error, stdout) => error ? reject(error) : resolve(stdout)
+    );
+  });
+}
+async function git(cwd, args, env) {
+  return (await gitRaw(cwd, args, env)).toString("utf8");
+}
+var FILTER_KEY = /^filter\..+\.(clean|process|required)$/;
+var REPO_SCOPES = /* @__PURE__ */ new Set(["local", "worktree"]);
+var MAX_DEPTH = 8;
+var isDir = (p) => import_node_fs.default.promises.stat(p).then((s) => s.isDirectory(), () => false);
+var exists = (p) => import_node_fs.default.promises.stat(p).then(() => true, () => false);
+async function repoFilterKeys(dir, depth = 0) {
+  const keys = /* @__PURE__ */ new Set();
+  const [raw, indexRaw] = await Promise.all([
+    gitRaw(dir, ["config", "--show-scope", "--null", "--name-only", "--get-regexp", FILTER_KEY.source], { LC_ALL: "C" }).catch((e) => {
+      if (e.code !== 1) throw e;
+      return Buffer.alloc(0);
+    }),
+    gitRaw(dir, ["ls-files", "--stage", "-z"])
+  ]);
+  const cfg = raw.toString("latin1").split("\0");
+  for (let i = 0; i + 1 < cfg.length; i += 2) {
+    if (!REPO_SCOPES.has(cfg[i])) continue;
+    const bytes = Buffer.from(cfg[i + 1], "latin1");
+    if (!Buffer.from(bytes.toString("utf8"), "utf8").equals(bytes)) throw new Error("\u043A\u043B\u044E\u0447 \u0444\u0438\u043B\u044C\u0442\u0440\u0430 \u043D\u0435 \u0432 UTF-8, \u043F\u0435\u0440\u0435\u043A\u0440\u044B\u0442\u044C \u043D\u0435\u043B\u044C\u0437\u044F");
+    keys.add(bytes.toString("utf8"));
+  }
+  const index = indexRaw.toString("latin1").split("\0");
+  const populated = [];
+  for (const entry of index) {
+    if (!entry.startsWith("160000 ")) continue;
+    const bytes = Buffer.from(entry.slice(entry.indexOf("	") + 1), "latin1");
+    const text = bytes.toString("utf8");
+    const utf8 = Buffer.from(text, "utf8").equals(bytes);
+    if (utf8) {
+      const rel = import_node_path2.default.relative(dir, import_node_path2.default.resolve(dir, text));
+      if (rel === "" || rel === ".." || rel.startsWith(".." + import_node_path2.default.sep) || import_node_path2.default.isAbsolute(rel)) continue;
+    }
+    const sub = Buffer.concat([Buffer.from(dir), Buffer.from(import_node_path2.default.sep), bytes]);
+    if (!await isDir(sub) || !await exists(Buffer.concat([sub, Buffer.from(import_node_path2.default.sep + ".git")]))) continue;
+    if (!utf8) throw new Error("\u043F\u0443\u0442\u044C \u0432\u043B\u043E\u0436\u0435\u043D\u043D\u043E\u0433\u043E \u0440\u0435\u043F\u043E\u0437\u0438\u0442\u043E\u0440\u0438\u044F \u043D\u0435 \u0432 UTF-8, \u043F\u0435\u0440\u0435\u043A\u0440\u044B\u0442\u044C \u0435\u0433\u043E \u0444\u0438\u043B\u044C\u0442\u0440\u044B \u043D\u0435\u043B\u044C\u0437\u044F");
+    populated.push(import_node_path2.default.join(dir, text));
+  }
+  if (populated.length > 0 && depth >= MAX_DEPTH) throw new Error("\u0432\u043B\u043E\u0436\u0435\u043D\u043D\u043E\u0441\u0442\u044C \u0440\u0435\u043F\u043E\u0437\u0438\u0442\u043E\u0440\u0438\u0435\u0432 \u0433\u043B\u0443\u0431\u0436\u0435 \u043F\u0440\u0435\u0434\u0435\u043B\u0430");
+  for (const nested of await Promise.all(populated.map((sub) => repoFilterKeys(sub, depth + 1)))) {
+    for (const key of nested) keys.add(key);
+  }
+  return keys;
+}
+async function filterOverrides(root) {
+  const base = Number(process.env.GIT_CONFIG_COUNT) || 0;
+  const keys = [...await repoFilterKeys(root)];
+  const env = { GIT_CONFIG_COUNT: String(base + keys.length) };
+  keys.forEach((key, i) => {
+    env[`GIT_CONFIG_KEY_${base + i}`] = key;
+    env[`GIT_CONFIG_VALUE_${base + i}`] = key.endsWith(".required") ? "false" : "";
+  });
+  return env;
+}
+async function gitRoot(dir) {
+  try {
+    return (await git(dir, ["rev-parse", "--show-toplevel"])).trim();
+  } catch {
+    return null;
+  }
+}
+async function gitBranch(root) {
+  try {
+    return (await git(root, ["rev-parse", "--abbrev-ref", "HEAD"])).trim();
+  } catch {
+    return null;
+  }
+}
+async function gitFiles(root) {
+  try {
+    const out = await git(root, ["ls-files", "-z", "--cached", "--others", "--exclude-standard"]);
+    return [...new Set(out.split("\0").filter(Boolean))];
+  } catch {
+    return null;
+  }
+}
+async function gitStatus(root) {
+  let out;
+  try {
+    const overrides = await filterOverrides(root);
+    out = await git(root, ["status", "--porcelain=v1", "-z", "--untracked-files=all"], overrides);
+  } catch {
+    return {};
+  }
+  const status = {};
+  const entries = out.split("\0");
+  for (let i = 0; i < entries.length; i++) {
+    const entry = entries[i];
+    if (entry.length < 4) continue;
+    const index = entry[0];
+    const worktree = entry[1];
+    const file = entry.slice(3).replace(/\/$/, "");
+    if (index === "R" || index === "C") i++;
+    if (index === "?") status[file] = "?";
+    else if (index === "U" || worktree === "U") status[file] = "U";
+    else status[file] = worktree !== " " ? worktree : index;
+  }
+  return status;
+}
+var MAX_ORIGINAL_BYTES = 5 * 1024 * 1024;
+async function gitHeadContent(file) {
+  const root = await gitRoot(import_node_path2.default.dirname(file));
+  if (!root) return null;
+  const rel = import_node_path2.default.relative(root, file).split(import_node_path2.default.sep).join("/");
+  if (!rel || rel.startsWith("..")) return null;
+  try {
+    const spec = `HEAD:./${rel}`;
+    if (Number(await git(root, ["cat-file", "-s", spec])) > MAX_ORIGINAL_BYTES) return null;
+    const blob = await gitRaw(root, ["cat-file", "blob", spec]);
+    return blob.subarray(0, 8e3).includes(0) ? null : blob.toString("utf8");
+  } catch {
+    return null;
+  }
+}
+
+// companions/agentd/src/main/git-search.ts
+var import_node_child_process2 = require("node:child_process");
+var import_node_fs2 = __toESM(require("node:fs"), 1);
+var import_node_path3 = __toESM(require("node:path"), 1);
+var import_node_vm = __toESM(require("node:vm"), 1);
+
+// companions/agentd/src/shared/search-pattern.ts
+var MAX_PATTERN_LENGTH = 200;
+var MAX_QUERY_LENGTH = 500;
+var MAX_HITS = 500;
+var MAX_LINE_LENGTH = 300;
+var escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+var WORD = "\\w\\u00C0-\\u024F\\u0400-\\u04FF";
+function patternOf(query, options) {
+  if (!options.regex && !options.wholeWord) return null;
+  const body = options.regex ? query : escapeRegExp(query);
+  const source = options.wholeWord ? `(?<![${WORD}])(?:${body})(?![${WORD}])` : body;
+  return { source, flags: options.caseSensitive ? "" : "i" };
+}
+function queryProblem(query, options) {
+  if (!query.trim()) return "\u0417\u0430\u043F\u0440\u043E\u0441 \u043F\u0443\u0441\u0442";
+  if (/[\0\r\n]/.test(query)) return "\u0412 \u0437\u0430\u043F\u0440\u043E\u0441\u0435 \u043D\u0435\u0434\u043E\u043F\u0443\u0441\u0442\u0438\u043C \u043F\u0435\u0440\u0435\u0432\u043E\u0434 \u0441\u0442\u0440\u043E\u043A\u0438";
+  const limit = options.regex ? MAX_PATTERN_LENGTH : MAX_QUERY_LENGTH;
+  if (query.length > limit) return `${options.regex ? "\u0412\u044B\u0440\u0430\u0436\u0435\u043D\u0438\u0435" : "\u0417\u0430\u043F\u0440\u043E\u0441"} \u0434\u043B\u0438\u043D\u043D\u0435\u0435 ${limit} \u0437\u043D\u0430\u043A\u043E\u0432`;
+  return null;
+}
+function lineHit(rel, line, raw, range, sign) {
+  const lead = raw.length - raw.trimStart().length;
+  const shift = Math.min(lead, range ? range.start : lead);
+  const text = raw.slice(shift, shift + MAX_LINE_LENGTH).trimEnd();
+  const shifted = range && range.start - shift < text.length ? { start: range.start - shift, end: Math.min(range.end - shift, text.length) } : null;
+  return { rel, line, text, range: shifted, ...sign ? { sign } : {} };
+}
+
+// companions/agentd/src/main/git-search.ts
+var GIT_TIMEOUT_MS = 15e3;
+var MAX_OUTPUT_BYTES = 16 * 1024 * 1024;
+var MATCH_TIMEOUT_MS = 2e3;
+var MAX_DIFF_LINE = 1e3;
+var MAX_UNTRACKED_FILES = 300;
+var MAX_UNTRACKED_BYTES = 1024 * 1024;
+function run(cwd, args, env, signal) {
+  return new Promise((resolve, reject) => {
+    (0, import_node_child_process2.execFile)(
+      "git",
+      [...SAFE_CONFIG, "-c", "core.quotePath=false", "-C", cwd, ...args],
+      { maxBuffer: MAX_OUTPUT_BYTES, encoding: "buffer", env: env ? { ...process.env, ...env } : process.env, signal, timeout: GIT_TIMEOUT_MS },
+      (error, stdout, stderr) => {
+        if (!error) return resolve({ stdout, stderr: "", code: 0, overflow: false });
+        const failure = error;
+        if (failure.name === "AbortError" || failure.code === "ABORT_ERR") return reject(failure);
+        if (failure.code === "ENOENT") return reject(failure);
+        resolve({
+          stdout: stdout ?? Buffer.alloc(0),
+          stderr: (stderr ?? Buffer.alloc(0)).toString("utf8"),
+          code: typeof failure.code === "number" ? failure.code : null,
+          overflow: failure.code === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER"
+        });
+      }
+    );
+  });
+}
+var empty = (extra = {}) => ({ hits: [], truncated: false, ...extra });
+function gitProblem(run3, regex) {
+  if (run3.code === null) return `\u041F\u043E\u0438\u0441\u043A \u043D\u0435 \u0443\u043B\u043E\u0436\u0438\u043B\u0441\u044F \u0432 ${GIT_TIMEOUT_MS / 1e3} \u0441`;
+  const text = run3.stderr;
+  if (/Perl-compatible|USE_LIBPCRE|PCRE/i.test(text) && /not compiled|cannot use|does not support|support/i.test(text)) {
+    return "\u0420\u0435\u0433\u0443\u043B\u044F\u0440\u043D\u044B\u0435 \u0432\u044B\u0440\u0430\u0436\u0435\u043D\u0438\u044F \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u043D\u044B: \u044D\u0442\u043E\u0442 git \u0441\u043E\u0431\u0440\u0430\u043D \u0431\u0435\u0437 PCRE";
+  }
+  const line = text.split("\n").find((l) => l.trim()) ?? "";
+  const reason = line.replace(/^(fatal|error): /, "").replace(/^command line, '[^']*': /, "").trim();
+  return regex ? `\u0412\u044B\u0440\u0430\u0436\u0435\u043D\u0438\u0435 \u043D\u0435 \u0440\u0430\u0437\u043E\u0431\u0440\u0430\u043D\u043E: ${reason || "\u043E\u0448\u0438\u0431\u043A\u0430 git"}` : reason || "git \u043D\u0435 \u0432\u044B\u043F\u043E\u043B\u043D\u0438\u043B \u043F\u043E\u0438\u0441\u043A";
+}
+function parseGrep(out, overflow) {
+  const lines = out.toString("utf8").split("\n");
+  if (overflow) lines.pop();
+  const hits = [];
+  for (const entry of lines) {
+    const first = entry.indexOf("\0");
+    const second = first < 0 ? -1 : entry.indexOf("\0", first + 1);
+    if (second < 0) continue;
+    const line = Number(entry.slice(first + 1, second));
+    if (Number.isInteger(line) && line > 0) hits.push({ rel: entry.slice(0, first), line, text: entry.slice(second + 1) });
+  }
+  return hits;
+}
+async function gitGrep(request, signal) {
+  const { root, query, options } = request;
+  const inGit = await gitRoot(root) !== null;
+  const args = [
+    "grep",
+    "-n",
+    "-I",
+    "--null",
+    "--no-color",
+    ...inGit ? ["--untracked"] : ["--no-index", "--exclude-standard"],
+    ...options.caseSensitive ? [] : ["-i"],
+    ...options.wholeWord ? ["-w"] : [],
+    options.regex ? "-P" : "-F",
+    "-e",
+    query,
+    "--",
+    "."
+  ];
+  const result = await run(root, args, void 0, signal);
+  if (result.code !== 0 && result.code !== 1 && !result.overflow) return empty({ error: gitProblem(result, options.regex) });
+  const found = parseGrep(result.stdout, result.overflow);
+  const hits = [];
+  for (const hit of found.slice(0, MAX_HITS)) {
+    const raw = hit.text.length > MAX_DIFF_LINE ? hit.text.slice(0, MAX_DIFF_LINE) : hit.text;
+    hits.push(lineHit(hit.rel, hit.line, raw, locate(raw, request)));
+  }
+  return { hits, truncated: found.length > MAX_HITS || result.overflow };
+}
+function locate(text, { query, options }) {
+  try {
+    const pattern = patternOf(query, options);
+    if (!pattern) {
+      const at = (options.caseSensitive ? text : text.toLocaleLowerCase()).indexOf(options.caseSensitive ? query : query.toLocaleLowerCase());
+      return at < 0 ? null : { start: at, end: at + query.length };
+    }
+    const found = new RegExp(pattern.source, pattern.flags).exec(text);
+    return found ? { start: found.index, end: found.index + found[0].length } : null;
+  } catch {
+    return null;
+  }
+}
+var HUNK = /^@@ -\d+(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/;
+function parseDiff(out) {
+  const lines = [];
+  let rel = null;
+  let oldLeft = 0;
+  let newLeft = 0;
+  let newLine = 0;
+  for (const row of out.split("\n")) {
+    if (oldLeft > 0 || newLeft > 0) {
+      if (row.startsWith("-") && oldLeft > 0) {
+        oldLeft--;
+        if (rel) lines.push({ rel, line: Math.max(1, newLine), sign: "-", text: row.slice(1) });
+        continue;
+      }
+      if (row.startsWith("+") && newLeft > 0) {
+        newLeft--;
+        if (rel) lines.push({ rel, line: newLine, sign: "+", text: row.slice(1) });
+        newLine++;
+        continue;
+      }
+      if (row.startsWith("\\")) continue;
+    }
+    if (row.startsWith("diff --git ")) {
+      rel = null;
+    } else if (row.startsWith("--- ")) {
+      const old = row.slice(4).split("	")[0];
+      if (old !== "/dev/null") rel = old;
+    } else if (row.startsWith("+++ ")) {
+      const next = row.slice(4).split("	")[0];
+      if (next !== "/dev/null") rel = next;
+    } else {
+      const hunk = HUNK.exec(row);
+      if (hunk) {
+        oldLeft = hunk[1] === void 0 ? 1 : Number(hunk[1]);
+        newLeft = hunk[3] === void 0 ? 1 : Number(hunk[3]);
+        newLine = Number(hunk[2]);
+      }
+    }
+  }
+  return lines;
+}
+async function untrackedLines(root, signal) {
+  const listing = await run(root, ["ls-files", "-z", "--others", "--exclude-standard"], void 0, signal);
+  if (listing.code !== 0) return [];
+  const files = listing.stdout.toString("utf8").split("\0").filter(Boolean).slice(0, MAX_UNTRACKED_FILES);
+  const lines = [];
+  for (const rel of files) {
+    if (signal.aborted) break;
+    const file = import_node_path3.default.join(root, rel);
+    try {
+      const stat = await import_node_fs2.default.promises.lstat(file);
+      if (!stat.isFile() || stat.size > MAX_UNTRACKED_BYTES) continue;
+      const content = await import_node_fs2.default.promises.readFile(file);
+      if (content.subarray(0, 8e3).includes(0)) continue;
+      content.toString("utf8").split("\n").forEach((text, index, all) => {
+        if (index === all.length - 1 && !text) return;
+        lines.push({ rel, line: index + 1, sign: "+", text });
+      });
+    } catch {
+    }
+  }
+  return lines;
+}
+function matchLines(texts, request, limit) {
+  const { query, options } = request;
+  const pattern = patternOf(query, options);
+  const ranges = new Array(texts.length).fill(null);
+  if (!pattern) {
+    const needle = options.caseSensitive ? query : query.toLocaleLowerCase();
+    let found = 0;
+    for (let i = 0; i < texts.length && found <= limit; i++) {
+      const at = (options.caseSensitive ? texts[i] : texts[i].toLocaleLowerCase()).indexOf(needle);
+      if (at >= 0) {
+        ranges[i] = { start: at, end: at + needle.length };
+        found++;
+      }
+    }
+    return { ranges };
+  }
+  try {
+    new RegExp(pattern.source, pattern.flags);
+  } catch (error) {
+    return { ranges, error: `\u0412\u044B\u0440\u0430\u0436\u0435\u043D\u0438\u0435 \u043D\u0435 \u0440\u0430\u0437\u043E\u0431\u0440\u0430\u043D\u043E: ${error.message.replace(/^Invalid regular expression: /, "")}` };
+  }
+  const context = import_node_vm.default.createContext({ texts, source: pattern.source, flags: pattern.flags, limit, starts: [], ends: [] });
+  try {
+    import_node_vm.default.runInContext(
+      `const re = new RegExp(source, flags);
+       let found = 0;
+       for (let i = 0; i < texts.length && found <= limit; i++) {
+         const m = re.exec(texts[i]);
+         starts.push(m ? m.index : -1);
+         ends.push(m ? m.index + m[0].length : -1);
+         if (m) found++;
+       }`,
+      context,
+      { timeout: MATCH_TIMEOUT_MS }
+    );
+  } catch {
+    return { ranges, error: `\u0412\u044B\u0440\u0430\u0436\u0435\u043D\u0438\u0435 \u0441\u043B\u0438\u0448\u043A\u043E\u043C \u0442\u044F\u0436\u0451\u043B\u043E\u0435: \u043D\u0435 \u0443\u043B\u043E\u0436\u0438\u043B\u043E\u0441\u044C \u0432 ${MATCH_TIMEOUT_MS / 1e3} \u0441` };
+  }
+  const { starts, ends } = context;
+  starts.forEach((start, i) => {
+    if (start >= 0) ranges[i] = { start, end: ends[i] };
+  });
+  return { ranges };
+}
+async function gitDiffSearch(request, signal) {
+  const { root } = request;
+  if (await gitRoot(root) === null) return empty({ error: "\u041D\u0435 git-\u0440\u0435\u043F\u043E\u0437\u0438\u0442\u043E\u0440\u0438\u0439" });
+  const overrides = await filterOverrides(root);
+  const diff = await run(
+    root,
+    ["diff", "HEAD", "-U0", "--no-ext-diff", "--no-textconv", "--no-color", "--no-prefix", "--no-renames", "--ignore-submodules=all"],
+    { ...overrides, LC_ALL: "C" },
+    signal
+  );
+  if (diff.code !== 0 && !diff.overflow) {
+    return empty({ error: /ambiguous argument|bad revision|unknown revision/.test(diff.stderr) ? "\u041D\u0435\u0442 \u043A\u043E\u043C\u043C\u0438\u0442\u0430 HEAD \u0434\u043B\u044F \u0441\u0440\u0430\u0432\u043D\u0435\u043D\u0438\u044F" : gitProblem(diff, false) });
+  }
+  const changed = parseDiff(diff.overflow ? diff.stdout.toString("utf8").split("\n").slice(0, -1).join("\n") : diff.stdout.toString("utf8"));
+  const lines = [...changed, ...await untrackedLines(root, signal)];
+  const texts = lines.map((l) => l.text.length > MAX_DIFF_LINE ? l.text.slice(0, MAX_DIFF_LINE) : l.text);
+  const { ranges, error } = matchLines(texts, request, MAX_HITS);
+  if (error) return empty({ error });
+  const hits = [];
+  let total = 0;
+  lines.forEach((entry, i) => {
+    const range = ranges[i];
+    if (!range) return;
+    total++;
+    if (hits.length < MAX_HITS) hits.push(lineHit(entry.rel, entry.line, texts[i], range, entry.sign));
+  });
+  return { hits, truncated: total > MAX_HITS || diff.overflow };
+}
+
+// companions/agentd/src/main/search-args.ts
+function validateSearchRequest(value) {
+  if (typeof value !== "object" || value === null) return null;
+  const { root, query, options } = value;
+  if (typeof root !== "string" || typeof query !== "string" || typeof options !== "object" || options === null) return null;
+  const { regex, caseSensitive, wholeWord } = options;
+  if (typeof regex !== "boolean" || typeof caseSensitive !== "boolean" || typeof wholeWord !== "boolean") return null;
+  const valid = { regex, caseSensitive, wholeWord };
+  return queryProblem(query, valid) === null ? { root, query, options: valid } : null;
+}
+
+// companions/agentd/src/main/search-run.ts
+var SearchRunner = class {
+  current = /* @__PURE__ */ new Map();
+  async run(kind, work, empty2) {
+    this.current.get(kind)?.abort();
+    const controller = new AbortController();
+    this.current.set(kind, controller);
+    try {
+      const reply = await work(controller.signal);
+      return controller.signal.aborted ? { ...empty2, cancelled: true } : reply;
+    } catch (error) {
+      if (controller.signal.aborted) return { ...empty2, cancelled: true };
+      throw error;
+    } finally {
+      if (this.current.get(kind) === controller) this.current.delete(kind);
+    }
+  }
+};
+
+// companions/agentd/src/main/history.ts
+var import_node_fs3 = __toESM(require("node:fs"), 1);
+var EDGE_BYTES = 64 * 1024;
+var TITLE_MAX = 120;
+var projectDirName = (cwd) => cwd.replace(/[^a-zA-Z0-9]/g, "-");
+var oneLine = (text) => {
+  const line = text.replace(/\s+/g, " ").trim();
+  return line.length > TITLE_MAX ? `${line.slice(0, TITLE_MAX - 1)}\u2026` : line;
+};
+function promptText(content) {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  const text = content.find((c) => c?.type === "text");
+  return typeof text?.text === "string" ? text.text : "";
+}
+function journalFacts(head, tail) {
+  let entrypoint;
+  let custom = "";
+  let ai = "";
+  let firstPrompt = "";
+  for (const [chunk, isHead] of [
+    [head, true],
+    [tail, false]
+  ]) {
+    for (const line of chunk.split("\n")) {
+      let record;
+      try {
+        record = JSON.parse(line);
+      } catch {
+        continue;
+      }
+      if (isHead && entrypoint === void 0 && typeof record.entrypoint === "string") entrypoint = record.entrypoint;
+      if (record.type === "custom-title" && typeof record.customTitle === "string") custom = record.customTitle;
+      if (record.type === "ai-title" && typeof record.aiTitle === "string") ai = record.aiTitle;
+      if (isHead && !firstPrompt && record.type === "user" && !record.isMeta) {
+        const text = promptText(record.message?.content).trim();
+        if (text && !text.startsWith("<")) firstPrompt = text;
+      }
+    }
+  }
+  return { interactive: entrypoint === "cli", title: oneLine(custom || ai || firstPrompt), named: oneLine(custom || ai), firstPrompt };
+}
+function readEdges(file, size) {
+  const fd = import_node_fs3.default.openSync(file, "r");
+  try {
+    const read = (start, length) => {
+      const buf = Buffer.alloc(length);
+      const n = import_node_fs3.default.readSync(fd, buf, 0, length, start);
+      return buf.subarray(0, n).toString("utf8");
+    };
+    return [read(0, Math.min(size, EDGE_BYTES)), size > EDGE_BYTES ? read(size - EDGE_BYTES, EDGE_BYTES) : ""];
+  } finally {
+    import_node_fs3.default.closeSync(fd);
+  }
+}
+function readJournalFacts(file) {
+  try {
+    const size = import_node_fs3.default.statSync(file).size;
+    return size > 0 ? journalFacts(...readEdges(file, size)) : null;
+  } catch {
+    return null;
+  }
+}
+
+// companions/agentd/src/agentd/git-auth.ts
+var HOST = /^[a-z0-9]([a-z0-9.-]*[a-z0-9])?(:\d{1,5})?$/;
+var TOKEN = /^[\x21-\x7e]{1,4096}$/;
+var MAX_CREDS = 16;
+function readAuth(value) {
+  const v = typeof value === "object" && value !== null ? value : {};
+  const git2 = [];
+  for (const item of Array.isArray(v.git) ? v.git : []) {
+    const c = typeof item === "object" && item !== null ? item : {};
+    if (c.kind !== "github" && c.kind !== "gitlab" || typeof c.host !== "string" || !HOST.test(c.host)) continue;
+    if (typeof c.token !== "string" || !TOKEN.test(c.token) || git2.some((g) => g.host === c.host)) continue;
+    git2.push({ kind: c.kind, host: c.host, token: c.token });
+    if (git2.length === MAX_CREDS) break;
+  }
+  const primary = typeof v.primary === "string" && HOST.test(v.primary) ? v.primary : void 0;
+  const claude = typeof v.claude === "string" && TOKEN.test(v.claude) ? v.claude : void 0;
+  return { git: git2, ...primary ? { primary } : {}, ...claude ? { claude } : {} };
+}
+function gitAuthEnv(auth) {
+  const env = {};
+  const pairs = [];
+  auth.git.forEach((cred, i) => {
+    const name = cred.host.replace(/:\d+$/, "");
+    const base = `https://${cred.host}`;
+    const user = cred.kind === "github" ? "x-access-token" : "oauth2";
+    pairs.push([`url.${base}/.insteadOf`, `git@${name}:`]);
+    pairs.push([`url.${base}/.insteadOf`, `ssh://git@${name}/`]);
+    pairs.push([`credential.${base}.helper`, ""]);
+    pairs.push([`credential.${base}.helper`, `!f() { test "$1" = get && printf 'username=%s\\npassword=%s\\n' ${user} "$CYBORG_GIT_TOKEN_${i}"; }; f`]);
+    env[`CYBORG_GIT_TOKEN_${i}`] = cred.token;
+  });
+  if (!pairs.length) return env;
+  env.GIT_CONFIG_COUNT = String(pairs.length);
+  pairs.forEach(([key, value], i) => {
+    env[`GIT_CONFIG_KEY_${i}`] = key;
+    env[`GIT_CONFIG_VALUE_${i}`] = value;
+  });
+  const github = auth.git.find((c) => c.kind === "github" && c.host === "github.com");
+  if (github) env.GH_TOKEN = github.token;
+  const enterprise = auth.git.find((c) => c.kind === "github" && c.host !== "github.com" && c.host === auth.primary) ?? auth.git.find((c) => c.kind === "github" && c.host !== "github.com");
+  if (enterprise) {
+    env.GH_ENTERPRISE_TOKEN = enterprise.token;
+    if (enterprise.host === auth.primary) env.GH_HOST = enterprise.host;
+  }
+  const gitlab = auth.git.find((c) => c.kind === "gitlab" && c.host === auth.primary) ?? auth.git.find((c) => c.kind === "gitlab");
+  if (gitlab) {
+    env.GITLAB_TOKEN = gitlab.token;
+    env.GITLAB_HOST = `https://${gitlab.host}`;
+  }
+  return env;
+}
+function agentAuthEnv(auth) {
+  return { ...gitAuthEnv(auth), ...auth.claude ? { CLAUDE_CODE_OAUTH_TOKEN: auth.claude } : {} };
+}
+
+// companions/agentd/src/agentd/claude-setup.ts
+var import_node_fs4 = __toESM(require("node:fs"), 1);
+var import_node_path4 = __toESM(require("node:path"), 1);
+function claudeHome(home2, custom) {
+  return { home: home2, configDir: custom || import_node_path4.default.join(home2, ".claude"), claudeJson: custom ? import_node_path4.default.join(custom, ".claude.json") : import_node_path4.default.join(home2, ".claude.json") };
+}
+var FILE_REL = /^(CLAUDE\.md|settings\.json|(hooks|commands|agents|skills|output-styles|bin)\/.+)$/;
+var NAME = /^[\w.-]{1,128}$/;
+var PLUGIN = /^[\w.-]{1,128}@[\w.-]{1,128}$/;
+var ORIG = ".cyborg-orig";
+function safeRel(rel) {
+  return typeof rel === "string" && rel.length < 1024 && !rel.includes("\0") && rel.split("/").every((p) => p !== "" && p !== "." && p !== "..");
+}
+function writeAtomic(file, data, mode) {
+  import_node_fs4.default.mkdirSync(import_node_path4.default.dirname(file), { recursive: true, mode: 448 });
+  const tmp = `${file}.cyborg-tmp-${process.pid}`;
+  import_node_fs4.default.writeFileSync(tmp, data, { mode });
+  import_node_fs4.default.chmodSync(tmp, mode);
+  import_node_fs4.default.renameSync(tmp, file);
+}
+var manifestFile = (root) => import_node_path4.default.join(root, "config.json");
+function readManifest(root) {
+  try {
+    const v = JSON.parse(import_node_fs4.default.readFileSync(manifestFile(root), "utf8"));
+    return typeof v.hash === "string" && Array.isArray(v.files) ? v : null;
+  } catch {
+    return null;
+  }
+}
+function configHash(root) {
+  return readManifest(root)?.hash ?? null;
+}
+var pluginsFile = (root) => import_node_path4.default.join(root, "plugins.json");
+function readPluginState(root) {
+  try {
+    const v = JSON.parse(import_node_fs4.default.readFileSync(pluginsFile(root), "utf8"));
+    return Array.isArray(v.marketplaces) && Array.isArray(v.plugins) && Array.isArray(v.notes) ? v : null;
+  } catch {
+    return null;
+  }
+}
+function writePluginState(root, state) {
+  writeAtomic(pluginsFile(root), JSON.stringify(state), 384);
+}
+var pluginsPending = (state) => !!state && (!state.done || state.notes.length > 0);
+var exists2 = (file) => {
+  try {
+    import_node_fs4.default.lstatSync(file);
+    return true;
+  } catch {
+    return false;
+  }
+};
+function applyFiles(root, ch, msg) {
+  if (typeof msg.hash !== "string" || !/^[0-9a-f]{64}$/.test(msg.hash) || !Array.isArray(msg.files)) throw new Error("\u043D\u0435\u043A\u043E\u0440\u0440\u0435\u043A\u0442\u043D\u0430\u044F \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0430 Claude");
+  const prev = new Set(readManifest(root)?.files ?? []);
+  const next = [];
+  for (const f of msg.files) {
+    if (!safeRel(f?.rel) || !FILE_REL.test(f.rel) || typeof f.b64 !== "string") continue;
+    const target = import_node_path4.default.join(ch.configDir, f.rel);
+    if (!prev.has(f.rel) && exists2(target) && !exists2(target + ORIG)) import_node_fs4.default.renameSync(target, target + ORIG);
+    writeAtomic(target, Buffer.from(f.b64, "base64"), f.mode === 493 ? 448 : 384);
+    next.push(f.rel);
+  }
+  const kept = new Set(next);
+  for (const rel of prev) {
+    if (kept.has(rel) || !safeRel(rel)) continue;
+    const target = import_node_path4.default.join(ch.configDir, rel);
+    import_node_fs4.default.rmSync(target, { force: true });
+    if (exists2(target + ORIG)) import_node_fs4.default.renameSync(target + ORIG, target);
+  }
+  writeAtomic(manifestFile(root), JSON.stringify({ hash: msg.hash, files: next }), 384);
+}
+var lastLine = (text) => text.trim().split("\n").pop()?.slice(0, 300) || "\u0431\u0435\u0437 \u043F\u043E\u044F\u0441\u043D\u0435\u043D\u0438\u044F";
+function names(stdout, key) {
+  try {
+    const list = JSON.parse(stdout);
+    return new Set(Array.isArray(list) ? list.map((x) => x?.[key]).filter((x) => typeof x === "string") : []);
+  } catch {
+    return /* @__PURE__ */ new Set();
+  }
+}
+async function installPlugins(exec, msg, env) {
+  const notes = [];
+  const markets = (Array.isArray(msg.marketplaces) ? msg.marketplaces : []).filter(
+    (m) => NAME.test(m?.name ?? "") && typeof m.source === "string" && m.source.length < 2048 && !m.source.startsWith("-")
+  );
+  const plugins = (Array.isArray(msg.plugins) ? msg.plugins : []).filter((p) => typeof p === "string" && PLUGIN.test(p));
+  if (!markets.length && !plugins.length) return notes;
+  const known = await exec("claude", ["plugin", "marketplace", "list", "--json"], { env, timeoutMs: 6e4 });
+  if (known.code !== 0) return [`\u043F\u043B\u0430\u0433\u0438\u043D\u044B Claude \u043D\u0435 \u043F\u043E\u0441\u0442\u0430\u0432\u043B\u0435\u043D\u044B: claude plugin marketplace list - ${lastLine(known.stderr)}`];
+  const have = names(known.stdout, "name");
+  for (const m of markets) {
+    if (have.has(m.name)) continue;
+    const r = await exec("claude", ["plugin", "marketplace", "add", m.source], { env, timeoutMs: 3e5 });
+    if (r.code !== 0) notes.push(`\u043C\u0430\u0440\u043A\u0435\u0442\u043F\u043B\u0435\u0439\u0441 ${m.name} \u043D\u0435 \u0434\u043E\u0431\u0430\u0432\u043B\u0435\u043D: ${lastLine(r.stderr || r.stdout)}`);
+  }
+  const listed = await exec("claude", ["plugin", "list", "--json"], { env, timeoutMs: 6e4 });
+  if (listed.code !== 0) return [...notes, `\u043F\u043B\u0430\u0433\u0438\u043D\u044B Claude \u043D\u0435 \u043F\u043E\u0441\u0442\u0430\u0432\u043B\u0435\u043D\u044B: claude plugin list - ${lastLine(listed.stderr)}`];
+  const installed = names(listed.stdout, "id");
+  for (const id of plugins) {
+    if (installed.has(id)) continue;
+    const r = await exec("claude", ["plugin", "install", id], { env, timeoutMs: 3e5 });
+    if (r.code !== 0) notes.push(`\u043F\u043B\u0430\u0433\u0438\u043D ${id} \u043D\u0435 \u043F\u043E\u0441\u0442\u0430\u0432\u043B\u0435\u043D: ${lastLine(r.stderr || r.stdout)}`);
+  }
+  return notes;
+}
+function trustClone(ch, dirs) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const seen = readClaudeJson(ch.claudeJson);
+    if (!seen) return;
+    const { data, mode, mtimeMs } = seen;
+    const projects = typeof data.projects === "object" && data.projects !== null ? { ...data.projects } : {};
+    const trusted = (dir) => projects[dir]?.hasTrustDialogAccepted === true;
+    if (data.hasCompletedOnboarding !== void 0 && dirs.every(trusted)) return;
+    data.hasCompletedOnboarding ??= true;
+    for (const dir of dirs) {
+      const prev = projects[dir];
+      projects[dir] = { ...typeof prev === "object" && prev !== null ? prev : {}, hasTrustDialogAccepted: true };
+    }
+    data.projects = projects;
+    if (mtimeOf(ch.claudeJson) !== mtimeMs) continue;
+    writeAtomic(ch.claudeJson, JSON.stringify(data, null, 2), mode);
+    return;
+  }
+}
+function readClaudeJson(file) {
+  try {
+    const st = import_node_fs4.default.statSync(file);
+    const v = JSON.parse(import_node_fs4.default.readFileSync(file, "utf8"));
+    if (typeof v !== "object" || v === null || Array.isArray(v)) return null;
+    return { data: v, mode: st.mode & 511, mtimeMs: st.mtimeMs };
+  } catch (error) {
+    return error?.code === "ENOENT" ? { data: {}, mode: 384, mtimeMs: null } : null;
+  }
+}
+function mtimeOf(file) {
+  try {
+    return import_node_fs4.default.statSync(file).mtimeMs;
+  } catch {
+    return null;
+  }
+}
+function writeMemory(ch, cwd, files) {
+  if (!Array.isArray(files)) return;
+  const dir = import_node_path4.default.join(ch.configDir, "projects", projectDirName(cwd), "memory");
+  for (const f of files) {
+    if (!safeRel(f?.rel) || typeof f.b64 !== "string") continue;
+    writeAtomic(import_node_path4.default.join(dir, f.rel), Buffer.from(f.b64, "base64"), 384);
+  }
+}
+var ENV_NAME = /^[A-Za-z_][A-Za-z0-9_]{0,127}$/;
+var ENV_DENY = /* @__PURE__ */ new Set(["PATH", "HOME", "USER", "LOGNAME", "SHELL", "TERM", "PWD"]);
+function readEnv(value, home2) {
+  const out = {};
+  if (typeof value !== "object" || value === null) return out;
+  for (const [k, v] of Object.entries(value)) {
+    if (!ENV_NAME.test(k) || ENV_DENY.has(k) || k.startsWith("CYBORG_") || typeof v !== "string" || v.includes("\0") || v.length > 32768) continue;
+    out[k] = v.startsWith("~/") ? import_node_path4.default.join(home2, v.slice(2)) : v;
+  }
+  return out;
+}
+function onPath(command, pathEnv) {
+  const runnable = (file) => {
+    try {
+      import_node_fs4.default.accessSync(file, import_node_fs4.default.constants.X_OK);
+      return import_node_fs4.default.statSync(file).isFile();
+    } catch {
+      return false;
+    }
+  };
+  if (command.includes("/")) return import_node_path4.default.isAbsolute(command) && runnable(command);
+  return pathEnv.split(":").some((dir) => dir && runnable(import_node_path4.default.join(dir, command)));
+}
+function hostMcp(value, home2, pathEnv) {
+  const servers = {};
+  const skipped = [];
+  if (typeof value !== "object" || value === null) return { servers, skipped };
+  const expand = (s) => typeof s === "string" && s.startsWith("~/") ? import_node_path4.default.join(home2, s.slice(2)) : s;
+  for (const [name, raw] of Object.entries(value)) {
+    if (!/^[\w.-]{1,64}$/.test(name) || name === "cyborg" || typeof raw !== "object" || raw === null || Array.isArray(raw)) continue;
+    const s = { ...raw };
+    const stdio = s.type === void 0 || s.type === "stdio";
+    if (stdio) {
+      if (typeof s.command !== "string" || !s.command) continue;
+      s.command = expand(s.command);
+      if (Array.isArray(s.args)) s.args = s.args.map(expand);
+      if (!onPath(s.command, pathEnv)) {
+        skipped.push(`\u0441\u0435\u0440\u0432\u0435\u0440 MCP ${name} \u043F\u0440\u043E\u043F\u0443\u0449\u0435\u043D: \u043D\u0430 \u0445\u043E\u0441\u0442\u0435 \u043D\u0435\u0442 ${s.command}`);
+        continue;
+      }
+    }
+    servers[name] = s;
+  }
+  return { servers, skipped };
+}
+
+// companions/agentd/src/main/session-state.ts
+var HOOK_COMMAND = '{ cat; echo; } >> "$CYBORG_EVENTS"';
+var HOOK_EVENTS = ["SessionStart", "UserPromptSubmit", "PostToolUse", "PostToolUseFailure", "Stop", "Notification"];
+var isToolEvent = (name) => name === "PostToolUse" || name === "PostToolUseFailure";
+function hookSettings() {
+  return {
+    hooks: Object.fromEntries(
+      HOOK_EVENTS.map((event) => [
+        event,
+        [{ ...isToolEvent(event) ? { matcher: "*" } : {}, hooks: [{ type: "command", command: HOOK_COMMAND }] }]
+      ])
+    )
+  };
+}
+var WAITING_NOTIFICATIONS = /* @__PURE__ */ new Map([
+  ["permission_prompt", "\u041F\u0440\u043E\u0441\u0438\u0442 \u0440\u0430\u0437\u0440\u0435\u0448\u0435\u043D\u0438\u0435"],
+  ["elicitation_dialog", "\u0417\u0430\u0434\u0430\u0451\u0442 \u0432\u043E\u043F\u0440\u043E\u0441"],
+  ["elicitation_url_dialog", "\u0417\u0430\u0434\u0430\u0451\u0442 \u0432\u043E\u043F\u0440\u043E\u0441"],
+  ["agent_needs_input", "\u0416\u0434\u0451\u0442 \u043E\u0442\u0432\u0435\u0442\u0430"],
+  ["quota_auto_resume_stale", "\u041E\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u043B\u0430\u0441\u044C \u043D\u0430 \u043B\u0438\u043C\u0438\u0442\u0435"],
+  ["quota_auto_resume_disabled", "\u041E\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u043B\u0430\u0441\u044C \u043D\u0430 \u043B\u0438\u043C\u0438\u0442\u0435"]
+]);
+function waitingReason(event) {
+  if (event.hook_event_name === "Stop") {
+    if (event.background_tasks?.length || event.session_crons?.length) return null;
+    return "\u0425\u043E\u0434 \u0437\u0430\u0432\u0435\u0440\u0448\u0451\u043D, \u0436\u0434\u0451\u0442 \u043E\u0442\u0432\u0435\u0442\u0430";
+  }
+  if (event.hook_event_name !== "Notification") return null;
+  return WAITING_NOTIFICATIONS.get(event.notification_type ?? "") ?? null;
+}
+function track(session, event) {
+  const name = event.hook_event_name;
+  if (name === "SessionStart") {
+    if (session.state === "starting") session.state = "waiting";
+  } else if (name === "UserPromptSubmit" || isToolEvent(name) && !event.agent_id) session.state = "working";
+  else if (name === "Stop") {
+    session.state = event.background_tasks?.length || event.session_crons?.length ? "working" : "waiting";
+    if (typeof event.last_assistant_message === "string") session.lastAnswer = withoutSuggestions(event.last_assistant_message);
+  } else if (name === "Notification") {
+    const reason = waitingReason(event);
+    if (!reason) return;
+    session.state = "asking";
+    session.reason = reason;
+    return;
+  } else return;
+  session.reason = void 0;
+}
+
+// companions/agentd/src/agentd/term-modes.ts
+var ALT_SCREEN = [1049, 1047, 47];
+var MAX_MODES = 64;
+var DecModes = class {
+  modes = /* @__PURE__ */ new Map();
+  state = "ground";
+  params = "";
+  feed(chunk) {
+    for (const b of chunk) {
+      switch (this.state) {
+        case "ground":
+          if (b === 27) this.state = "esc";
+          break;
+        case "esc":
+          if (b === 99) this.modes.clear();
+          this.state = b === 91 ? "csi" : b === 27 ? "esc" : "ground";
+          break;
+        case "csi":
+          this.params = "";
+          this.state = b === 63 ? "private" : b === 27 ? "esc" : "ground";
+          break;
+        case "private":
+          if (b >= 48 && b <= 57 || b === 59) {
+            if (this.params.length < 64) this.params += String.fromCharCode(b);
+            break;
+          }
+          if (b === 104 || b === 108) this.set(b === 104);
+          this.state = b === 27 ? "esc" : "ground";
+      }
+    }
+  }
+  /** Альтернативный экран идёт первым: переключение на него чистит экран. */
+  restore() {
+    const alt = (n) => ALT_SCREEN.includes(n) ? 0 : 1;
+    return [...this.modes].sort(([a], [b]) => alt(a) - alt(b)).map(([n, on]) => `\x1B[?${n}${on ? "h" : "l"}`).join("");
+  }
+  set(on) {
+    for (const p of this.params.split(";")) {
+      if (!p) continue;
+      const n = Number(p);
+      if (this.modes.has(n) || this.modes.size < MAX_MODES) this.modes.set(n, on);
+    }
+  }
+};
+
+// companions/agentd/src/agentd/mic.ts
+var import_node_child_process3 = require("node:child_process");
+var import_node_fs5 = __toESM(require("node:fs"), 1);
+var import_node_net = __toESM(require("node:net"), 1);
+var import_node_path5 = __toESM(require("node:path"), 1);
+var MIC_SOCK = "mic.sock";
+var MIC_BIN = "bin";
+var LINE_MAX = 512;
+function splitLine(buf) {
+  const nl = buf.indexOf(10);
+  if (nl < 0) return null;
+  return { line: buf.subarray(0, nl).toString("utf8"), rest: buf.subarray(nl + 1) };
+}
+function readLine(socket, timeoutMs = 1e4) {
+  return new Promise((resolve, reject) => {
+    let buf = Buffer.alloc(0);
+    const timer = setTimeout(() => done(new Error("\u043D\u0435\u0442 \u043E\u0442\u0432\u0435\u0442\u0430")), timeoutMs);
+    const onData = (chunk) => {
+      buf = Buffer.concat([buf, chunk]);
+      const got = splitLine(buf);
+      if (got) return done(null, got);
+      if (buf.length > LINE_MAX) done(new Error("\u0441\u043B\u0438\u0448\u043A\u043E\u043C \u0434\u043B\u0438\u043D\u043D\u0430\u044F \u0441\u0442\u0440\u043E\u043A\u0430"));
+    };
+    const onEnd = () => done(new Error("\u0441\u043E\u0435\u0434\u0438\u043D\u0435\u043D\u0438\u0435 \u0437\u0430\u043A\u0440\u044B\u0442\u043E"));
+    const done = (error, got) => {
+      clearTimeout(timer);
+      socket.off("data", onData);
+      socket.off("end", onEnd);
+      socket.off("error", onEnd);
+      if (error) reject(error);
+      else resolve(got);
+    };
+    socket.on("data", onData);
+    socket.on("end", onEnd);
+    socket.on("error", onEnd);
+  });
+}
+function micServer(target) {
+  return import_node_net.default.createServer((socket) => {
+    socket.on("error", () => socket.destroy());
+    readLine(socket).then(
+      ({ line }) => {
+        const to = target();
+        if (typeof to === "string") return void socket.end(`no ${to}
+`);
+        if (line === "probe") return void socket.end("ok\n");
+        if (line !== "record") return void socket.end("no \u043D\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043D\u044B\u0439 \u0437\u0430\u043F\u0440\u043E\u0441\n");
+        const up = import_node_net.default.connect(to.forward);
+        up.on("error", () => {
+          if (!socket.destroyed) socket.end("no \u0442\u0443\u043D\u043D\u0435\u043B\u044C \u043C\u0438\u043A\u0440\u043E\u0444\u043E\u043D\u0430 Cyborg \u043E\u0431\u043E\u0440\u0432\u0430\u043D\n");
+        });
+        up.on("connect", () => up.write(JSON.stringify({ sid: to.sid }) + "\n"));
+        socket.on("close", () => up.destroy());
+        up.pipe(socket);
+      },
+      () => socket.destroy()
+    );
+  });
+}
+function realArecord(pathVar, own) {
+  for (const dir of pathVar.split(":")) {
+    if (!dir || import_node_path5.default.resolve(dir) === import_node_path5.default.resolve(own)) continue;
+    const file = import_node_path5.default.join(dir, "arecord");
+    try {
+      import_node_fs5.default.accessSync(file, import_node_fs5.default.constants.X_OK);
+      return file;
+    } catch {
+    }
+  }
+  return null;
+}
+async function arecord(args, env, own) {
+  if (args.includes("--version")) {
+    process.stdout.write("arecord: \u043C\u0438\u043A\u0440\u043E\u0444\u043E\u043D Cyborg \u0434\u043B\u044F \u0443\u0434\u0430\u043B\u0451\u043D\u043D\u043E\u0439 \u0441\u0435\u0441\u0441\u0438\u0438\n");
+    return 0;
+  }
+  const target = args[args.length - 1] ?? "-";
+  const probe = target === "/dev/null";
+  const refuse = (reason) => {
+    const real = realArecord(env.PATH ?? "", own);
+    if (real) return passThrough(real, args);
+    process.stderr.write(`arecord: ${reason}
+`);
+    return Promise.resolve(1);
+  };
+  const sock2 = env.CYBORG_MIC;
+  if (!sock2) return refuse("\u0441\u043E\u043A\u0435\u0442 \u043C\u0438\u043A\u0440\u043E\u0444\u043E\u043D\u0430 Cyborg \u043D\u0435 \u0437\u0430\u0434\u0430\u043D");
+  const socket = import_node_net.default.connect(sock2);
+  try {
+    await new Promise((resolve, reject) => {
+      socket.once("connect", resolve);
+      socket.once("error", reject);
+    });
+  } catch {
+    return refuse("\u0434\u0435\u043C\u043E\u043D Cyborg \u043D\u0435 \u043F\u0440\u0438\u043D\u0438\u043C\u0430\u0435\u0442 \u0437\u0430\u043F\u0438\u0441\u044C");
+  }
+  socket.write(probe ? "probe\n" : "record\n");
+  let head;
+  try {
+    head = await readLine(socket, 3e4);
+  } catch (error) {
+    socket.destroy();
+    return refuse(`\u043C\u0438\u043A\u0440\u043E\u0444\u043E\u043D Cyborg \u043D\u0435 \u043E\u0442\u0432\u0435\u0442\u0438\u043B: ${error.message}`);
+  }
+  if (head.line !== "ok") {
+    socket.destroy();
+    return refuse(head.line.replace(/^no /, "") || "\u043C\u0438\u043A\u0440\u043E\u0444\u043E\u043D Cyborg \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D");
+  }
+  if (probe) {
+    socket.destroy();
+    return 0;
+  }
+  const out = target === "-" ? process.stdout : import_node_fs5.default.createWriteStream(target);
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (code, flush = true) => {
+      if (done) return;
+      done = true;
+      socket.destroy();
+      if (flush && out !== process.stdout) out.end(() => resolve(code));
+      else resolve(code);
+    };
+    process.once("SIGTERM", () => finish(0));
+    process.once("SIGINT", () => finish(0));
+    out.on("error", () => finish(0, false));
+    if (head.rest.length) out.write(head.rest);
+    socket.pipe(out);
+    socket.on("end", () => finish(0));
+    socket.on("error", () => finish(1));
+  });
+}
+function passThrough(file, args) {
+  return new Promise((resolve) => {
+    const child = (0, import_node_child_process3.spawn)(file, args, { stdio: "inherit" });
+    const stop = () => void child.kill("SIGTERM");
+    process.once("SIGTERM", stop);
+    process.once("SIGINT", stop);
+    child.on("error", () => resolve(1));
+    child.on("close", (code) => resolve(code ?? 0));
+  });
+}
+function arecordScript(node, script, quote) {
+  return `#!/bin/sh
+exec ${quote(node)} ${quote(script)} arecord "$@"
+`;
+}
+
+// companions/agentd/src/agentd/daemon.ts
+var MAX_PROXY_BODY = 1024 * 1024;
+var FORWARD = /^(fwd|mic)-[0-9a-f]{16}\.sock$/;
+var SUN_PATH_MAX = 107;
+var OFFLINE_TEXT = "Cyborg \u043D\u0435 \u043D\u0430 \u0441\u0432\u044F\u0437\u0438 (\u0437\u0430\u043A\u0440\u044B\u0442 \u043B\u0438\u0431\u043E \u043E\u0431\u043E\u0440\u0432\u0430\u043D \u0442\u0443\u043D\u043D\u0435\u043B\u044C): \u0432\u044B\u0437\u043E\u0432 \u043D\u0435 \u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D, \u043F\u043E\u0432\u0442\u043E\u0440\u0438 \u0435\u0433\u043E \u043F\u043E\u0437\u0436\u0435";
+var Daemon = class {
+  constructor(deps) {
+    this.deps = deps;
+    this.root = import_node_path6.default.join(deps.home, ".cyborg");
+    this.claude = claudeHome(deps.home, deps.claudeConfigDir);
+    for (const sub of ["sessions", "work", "run"]) import_node_fs6.default.mkdirSync(import_node_path6.default.join(this.root, sub), { recursive: true, mode: 448 });
+    this.tick = setInterval(() => void this.enforceLimits(), deps.tickMs ?? 3e4);
+    this.tick.unref();
+  }
+  deps;
+  sessions = /* @__PURE__ */ new Map();
+  conns = /* @__PURE__ */ new Set();
+  searches = new SearchRunner();
+  root;
+  tick;
+  claude;
+  /** Установка плагинов зеркала: запуск claude её ждёт, чтобы агент стартовал с настройкой оператора. */
+  setup = Promise.resolve();
+  setupRuns = 0;
+  stopped = false;
+  stop() {
+    this.stopped = true;
+    clearInterval(this.tick);
+    for (const s of this.sessions.values()) this.teardownIo(s);
+  }
+  /** Демон выходит, когда нет ни клиентов, ни сессий, кроме спящих: те лежат на диске и поднимутся следующим демоном. */
+  idle() {
+    return this.conns.size === 0 && [...this.sessions.values()].every((s) => s.meta.state === "asleep");
+  }
+  liveCount() {
+    return [...this.sessions.values()].filter((s) => !s.exited && s.meta.state !== "asleep").length;
+  }
+  /** Сессии с диска после перезапуска демона: живые по записи засыпают, прерванная уборка доделывается, незапущенные убираются. */
+  async init() {
+    const base = import_node_path6.default.join(this.root, "sessions");
+    for (const sid of import_node_fs6.default.readdirSync(base)) {
+      let meta;
+      try {
+        meta = JSON.parse(import_node_fs6.default.readFileSync(import_node_path6.default.join(base, sid, "meta.json"), "utf8"));
+      } catch {
+        continue;
+      }
+      if (meta.sid !== sid || this.sessions.has(sid) || meta.state === "done" && !meta.ended) continue;
+      meta.round ??= 1;
+      meta.roundStartedAt ??= meta.startedAt;
+      meta.lastActive ??= meta.startedAt;
+      meta.launched ??= meta.port > 0;
+      const sess = this.makeSess(meta, "");
+      this.sessions.set(sid, sess);
+      if (meta.ended) {
+        sess.gone = true;
+        sess.exited = { code: 1, reason: meta.ended.reason, kept: meta.ended.cleanup.kept };
+        continue;
+      }
+      if (meta.state !== "asleep" && meta.pgid) this.killStale(meta.pgid, import_node_path6.default.join(sess.dir, "launch.sh"));
+      meta.pgid = void 0;
+      import_node_fs6.default.rmSync(import_node_path6.default.join(sess.dir, "mcp.json"), { force: true });
+      if (meta.closing) {
+        await this.finishClose(sess, meta.closing);
+        continue;
+      }
+      if (!meta.launched) {
+        await this.cleanClones(sess, true);
+        this.sessions.delete(sid);
+        import_node_fs6.default.rmSync(sess.dir, { recursive: true, force: true });
+        continue;
+      }
+      meta.state = "asleep";
+      sess.sleeping = Promise.resolve();
+      this.saveMeta(sess);
+    }
+  }
+  killStale(pgid, marker) {
+    if (!this.deps.groupOwned?.(pgid, marker)) return;
+    this.deps.killGroup(pgid, "SIGTERM");
+    const t = setTimeout(() => {
+      if (this.deps.groupOwned?.(pgid, marker)) this.deps.killGroup(pgid, "SIGKILL");
+    }, this.deps.killGraceMs ?? 1e4);
+    t.unref();
+  }
+  async finishClose(sess, closing) {
+    const cleanup = await this.close(sess, closing.keep, closing.reason);
+    if (!closing.reason) return;
+    this.settleEnded(sess, { status: "failed", reason: closing.reason, cleanup });
+  }
+  /**
+   * Итог, выставленный демоном, ждёт ack на диске. Сессия без процесса (до запуска, после перезапуска демона) выхода не даст:
+   * close снял её запись, поэтому она возвращается в карту, чтобы attach и ack нашли её, а exit уходит владельцу здесь.
+   */
+  settleEnded(sess, ended) {
+    sess.meta.ended = ended;
+    const idle = !sess.proc;
+    if (idle) {
+      sess.gone = true;
+      sess.exited = { code: 1, reason: ended.reason, kept: ended.cleanup.kept };
+      this.sessions.set(sess.sid, sess);
+    }
+    this.saveMeta(sess);
+    if (sess.owner?.open) sess.owner.send({ type: "ended", sid: sess.sid, ...ended });
+    if (idle) this.deliverExit(sess);
+  }
+  makeSess(meta, token, owner, size, auth = { git: [] }) {
+    return {
+      sid: meta.sid,
+      token,
+      auth,
+      dir: import_node_path6.default.join(this.root, "sessions", meta.sid),
+      meta,
+      ring: [],
+      ringStart: 0,
+      ringEnd: 0,
+      modes: new DecModes(),
+      decoder: new import_node_string_decoder.StringDecoder("utf8"),
+      emitted: 0,
+      evOff: 0,
+      tracked: { state: "starting" },
+      lastHookAt: this.deps.now(),
+      owner,
+      sockets: /* @__PURE__ */ new Set(),
+      size,
+      prepared: false,
+      extra: { env: {}, mcp: {} }
+    };
+  }
+  connect(client) {
+    const conn = { send: (m) => client.send(m), instance: "", open: true };
+    this.conns.add(conn);
+    return {
+      receive: (msg) => void this.handle(conn, msg).catch((e) => conn.send({ type: "error", rid: msg.rid, message: String(e?.message ?? e).slice(0, 500) })),
+      close: () => {
+        conn.open = false;
+        this.conns.delete(conn);
+        for (const s of this.sessions.values()) if (s.owner === conn) s.owner = void 0;
+      }
+    };
+  }
+  async handle(conn, msg) {
+    const reply = (extra) => conn.send({ type: msg.type, rid: msg.rid, ...extra });
+    const fail = (message) => conn.send({ type: "error", rid: msg.rid, message });
+    const sess = typeof msg.sid === "string" ? this.sessions.get(msg.sid) : void 0;
+    switch (msg.type) {
+      case "hello":
+        conn.instance = typeof msg.instance === "string" ? msg.instance : "";
+        conn.fwd = typeof msg.fwd === "string" ? msg.fwd : void 0;
+        conn.mic = typeof msg.mic === "string" && FORWARD.test(import_node_path6.default.basename(msg.mic)) ? msg.mic : void 0;
+        this.dropStaleForwards([conn.fwd, conn.mic]);
+        return reply({ proto: PROTO, version: this.deps.version, sessions: this.awake().length, live: this.liveCount(), config: configHash(this.root), disk: this.space() });
+      case "disk":
+        return reply(await this.disk());
+      case "purge":
+        return reply({ results: await this.purge(msg.sids, msg.force === true) });
+      case "config":
+        return this.configure(msg, reply);
+      case "list":
+        return reply({ sessions: [...this.sessions.values()].map((s) => this.listItem(s, conn)) });
+      case "shutdown":
+        if (this.awake().length) return fail("\u043D\u0430 \u0445\u043E\u0441\u0442\u0435 \u0435\u0441\u0442\u044C \u0441\u0435\u0441\u0441\u0438\u0438");
+        reply({});
+        setImmediate(() => this.deps.onShutdown?.());
+        return;
+      case "spawn":
+        return this.spawn(conn, msg, reply, fail);
+      case "attach":
+        if (!sess) return fail("\u0441\u0435\u0441\u0441\u0438\u044F \u043D\u0430 \u0445\u043E\u0441\u0442\u0435 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u0430");
+        return this.attach(conn, sess, msg, reply, fail);
+      case "wake":
+        if (!sess) return fail("\u0441\u0435\u0441\u0441\u0438\u044F \u043D\u0430 \u0445\u043E\u0441\u0442\u0435 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u0430");
+        return this.wake(conn, sess, msg, reply, fail);
+      case "input":
+        if (sess?.proc && !sess.gone && sess.meta.state === "live") {
+          sess.proc.write(String(msg.data ?? ""));
+          sess.meta.lastActive = this.deps.now();
+        }
+        return;
+      case "resize":
+        if (sess) await this.resize(sess, Number(msg.cols), Number(msg.rows));
+        return;
+      case "close": {
+        if (!sess) return fail("\u0441\u0435\u0441\u0441\u0438\u044F \u043D\u0430 \u0445\u043E\u0441\u0442\u0435 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u0430");
+        const result = await this.close(sess, msg.keep === true);
+        return reply({ ...result });
+      }
+      case "report":
+        if (!sess) return fail("\u0441\u0435\u0441\u0441\u0438\u044F \u043D\u0430 \u0445\u043E\u0441\u0442\u0435 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u0430");
+        if (sess.meta.state !== "live" || sess.exited) return fail("\u0441\u0435\u0441\u0441\u0438\u044F \u043D\u0435 \u0440\u0430\u0431\u043E\u0442\u0430\u0435\u0442");
+        if (sess.meta.reported) return fail("\u0438\u0442\u043E\u0433 \u044D\u0442\u043E\u0433\u043E \u043A\u0440\u0443\u0433\u0430 \u0440\u0430\u0431\u043E\u0442\u044B \u0443\u0436\u0435 \u043E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D: \u043D\u043E\u0432\u044B\u0439 \u043A\u0440\u0443\u0433 \u043D\u0430\u0447\u043D\u0451\u0442\u0441\u044F \u0441\u043E \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0435\u0433\u043E \u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u044F \u0441\u0435\u0441\u0441\u0438\u0438");
+        sess.meta.reported = true;
+        this.saveMeta(sess);
+        return reply({});
+      case "ack":
+        if (sess?.meta.ended) {
+          sess.meta.ended = void 0;
+          sess.meta.state = "done";
+          this.saveMeta(sess);
+          this.reap(sess);
+        }
+        return;
+      case "fs":
+        if (!sess) return fail("\u0441\u0435\u0441\u0441\u0438\u044F \u043D\u0430 \u0445\u043E\u0441\u0442\u0435 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u0430");
+        return reply(await this.fsOp(sess, String(msg.op), String(msg.path ?? "")));
+      case "search":
+        if (!sess) return fail("\u0441\u0435\u0441\u0441\u0438\u044F \u043D\u0430 \u0445\u043E\u0441\u0442\u0435 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u0430");
+        return reply(await this.search(sess, msg.mode, msg.request));
+      default:
+        return fail(`\u043D\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043D\u043E\u0435 \u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u0435 ${msg.type}`);
+    }
+  }
+  awake() {
+    return [...this.sessions.values()].filter((s) => s.meta.state !== "asleep");
+  }
+  listItem(s, conn) {
+    const base = { sid: s.sid, dirs: s.meta.dirs, origin: s.meta.origin, keep: s.meta.keep, spawnedBy: s.meta.spawnedBy, cwd: s.meta.cwd, clones: s.meta.clones.map((c) => c.path), branch: s.meta.branch, lastActive: s.meta.lastActive };
+    if (s.meta.state === "asleep") return { ...base, asleep: true, title: this.title(s.meta) };
+    return {
+      ...base,
+      token: s.token,
+      reported: s.meta.reported,
+      round: s.meta.round,
+      exited: s.exited !== void 0,
+      busy: !!s.owner && s.owner.open && s.owner.instance !== conn.instance
+    };
+  }
+  /** Заголовок разговора из журнала claude на хосте: им спящая сессия названа в «Истории». */
+  title(meta) {
+    return readJournalFacts(this.journalOf(meta))?.title || meta.branch;
+  }
+  journalOf(meta) {
+    return import_node_path6.default.join(this.claude.configDir, "projects", projectDirName(meta.cwd), `${meta.sid}.jsonl`);
+  }
+  space() {
+    try {
+      const st = import_node_fs6.default.statfsSync(this.root);
+      return { free: st.bavail * st.bsize, total: st.blocks * st.bsize };
+    } catch {
+      return null;
+    }
+  }
+  readMetaFile(sid) {
+    try {
+      const meta = JSON.parse(import_node_fs6.default.readFileSync(import_node_path6.default.join(this.root, "sessions", sid, "meta.json"), "utf8"));
+      return meta.sid === sid && Array.isArray(meta.clones) ? meta : null;
+    } catch {
+      return null;
+    }
+  }
+  /** Клоны каталога work/<sid> - все его подкаталоги: остальные репозитории агент клонирует сам и мог положить не туда, куда отведено. */
+  clonesOf(sid) {
+    const work = import_node_path6.default.join(this.root, "work", sid);
+    try {
+      return import_node_fs6.default.readdirSync(work, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => ({ name: d.name, path: import_node_path6.default.join(work, d.name) }));
+    } catch {
+      return [];
+    }
+  }
+  async du(dir) {
+    const r = await this.deps.exec("du", ["-sk", dir], { timeoutMs: DU_TIMEOUT_MS });
+    const kb = Number(r.stdout.trim().split(/\s/)[0]);
+    return r.code === 0 && Number.isFinite(kb) ? kb * 1024 : null;
+  }
+  /** Место на хосте: каталоги work/ с диска, в том числе завершённые с оставленными клонами - демон их в памяти не держит. */
+  async disk() {
+    const work = import_node_path6.default.join(this.root, "work");
+    const items = [];
+    let names2 = [];
+    try {
+      names2 = import_node_fs6.default.readdirSync(work).sort();
+    } catch {
+    }
+    for (const sid of names2) {
+      if (!SID.test(sid)) continue;
+      const sess = this.sessions.get(sid);
+      const meta = sess?.meta ?? this.readMetaFile(sid);
+      const state = sess ? sess.meta.state === "asleep" ? "asleep" : "live" : meta ? "done" : "orphan";
+      let lastActive = meta?.lastActive ?? 0;
+      if (!lastActive) {
+        const st = import_node_fs6.default.statSync(import_node_path6.default.join(work, sid), { throwIfNoEntry: false });
+        if (!st) continue;
+        lastActive = st.mtimeMs;
+      }
+      const row = { sid, state, title: meta ? this.title(meta) : "", branch: meta?.branch ?? "", dirs: meta?.dirs ?? [], lastActive, bytes: null, dirty: [], measured: false };
+      items.push({ sid, live: state === "live", meta, row });
+    }
+    let open = true;
+    const measure = async (item) => {
+      const dirty = [];
+      if (!item.live) {
+        for (const c of this.clonesOf(item.sid)) {
+          if (!open) return;
+          const reason = await this.dirtyReason(c.path);
+          if (reason) dirty.push({ path: c.path, reason });
+        }
+      }
+      const bytes = open ? await this.du(import_node_path6.default.join(work, item.sid)) : null;
+      if (open) Object.assign(item.row, { bytes, dirty, measured: true });
+    };
+    let next = 0;
+    const worker = async () => {
+      while (open && next < items.length) await measure(items[next++]);
+    };
+    let timer;
+    const budget = new Promise((resolve) => timer = setTimeout(resolve, this.deps.diskBudgetMs ?? DISK_BUDGET_MS));
+    await Promise.race([Promise.all(Array.from({ length: Math.min(DISK_POOL, items.length) }, worker)), budget]);
+    open = false;
+    clearTimeout(timer);
+    return { ...this.space() ?? { free: 0, total: 0 }, sessions: items.map((i) => i.row) };
+  }
+  /** Удаление отмеченного: работающие не трогаются, грязные клоны - только с force. */
+  async purge(sids, force) {
+    const results = [];
+    for (const sid of new Set(Array.isArray(sids) ? sids.slice(0, 500) : [])) {
+      if (typeof sid !== "string" || !SID.test(sid)) continue;
+      const sess = this.sessions.get(sid);
+      if (sess && sess.meta.state !== "asleep") {
+        results.push({ sid, removed: [], kept: [], error: "\u0441\u0435\u0441\u0441\u0438\u044F \u0440\u0430\u0431\u043E\u0442\u0430\u0435\u0442: \u0435\u0451 \u0437\u0430\u043A\u0440\u044B\u0432\u0430\u044E\u0442 \u0432\u043A\u043B\u0430\u0434\u043A\u043E\u0439" });
+        continue;
+      }
+      if (sess) {
+        results.push({ sid, ...await this.close(sess, false, void 0, force) });
+        continue;
+      }
+      const meta = this.readMetaFile(sid);
+      const stub = this.makeSess(meta ?? { sid, clones: [] }, "");
+      results.push({ sid, ...await this.cleanClones(stub, force) });
+    }
+    return results;
+  }
+  dropStaleForwards(current) {
+    const dir = import_node_path6.default.join(this.root, "run");
+    const live = new Set([...current, ...[...this.conns].flatMap((c) => [c.fwd, c.mic])].filter(Boolean));
+    for (const name of import_node_fs6.default.readdirSync(dir)) {
+      const file = import_node_path6.default.join(dir, name);
+      if (FORWARD.test(name) && !live.has(file)) import_node_fs6.default.rmSync(file, { force: true });
+    }
+  }
+  async spawn(conn, msg, reply, fail) {
+    const limits = { ...DEFAULT_LIMITS, ...msg.limits };
+    if (this.liveCount() >= limits.maxPerHost) return fail(`\u043D\u0430 \u0445\u043E\u0441\u0442\u0435 \u0443\u0436\u0435 ${this.liveCount()} \u0443\u0434\u0430\u043B\u0451\u043D\u043D\u044B\u0445 \u0441\u0435\u0441\u0441\u0438\u0439 (\u043F\u0440\u0435\u0434\u0435\u043B ${limits.maxPerHost})`);
+    if (!/^[0-9a-f-]{8,64}$/.test(msg.sid) || this.sessions.has(msg.sid)) return fail("\u043D\u0435\u043A\u043E\u0440\u0440\u0435\u043A\u0442\u043D\u044B\u0439 \u043D\u043E\u043C\u0435\u0440 \u0441\u0435\u0441\u0441\u0438\u0438");
+    const dir = import_node_path6.default.join(this.root, "sessions", msg.sid);
+    const work = import_node_path6.default.join(this.root, "work", msg.sid);
+    import_node_fs6.default.mkdirSync(dir, { recursive: true, mode: 448 });
+    import_node_fs6.default.mkdirSync(work, { recursive: true, mode: 448 });
+    const names2 = uniqueNames(msg.repos.map((r) => r.name));
+    const clones = names2.map((name, i) => ({ name, path: import_node_path6.default.join(work, name), url: msg.repos[i].url }));
+    const selected = msg.selected;
+    const now = this.deps.now();
+    const meta = {
+      sid: msg.sid,
+      dirs: [msg.repos[selected].local, ...msg.repos.filter((_, i) => i !== selected).map((r) => r.local)],
+      origin: msg.origin,
+      keep: msg.keep,
+      spawnedBy: msg.spawnedBy,
+      branch: msg.branch,
+      clones,
+      cwd: clones[selected].path,
+      port: 0,
+      startedAt: now,
+      reported: false,
+      limits,
+      state: "live",
+      round: 1,
+      roundStartedAt: now,
+      lastActive: now,
+      launched: false
+    };
+    const sess = this.makeSess(meta, msg.token, conn, { cols: msg.cols, rows: msg.rows }, readAuth(msg.auth));
+    sess.extra = this.readExtra(msg);
+    this.sessions.set(sess.sid, sess);
+    this.saveMeta(sess);
+    reply({ sid: sess.sid, cwd: meta.cwd, clones: clones.map((c) => c.path) });
+    void this.prepareAndStart(sess, msg, clones, selected).catch((e) => this.failStart(sess, String(e?.message ?? e)));
+  }
+  /** Зеркало настройки Claude: файлы пишутся до ответа, плагины ставятся в фоне, запуск агента их ждёт. */
+  configure(msg, reply) {
+    applyFiles(this.root, this.claude, msg);
+    const marketplaces = Array.isArray(msg.marketplaces) ? msg.marketplaces : [];
+    const plugins = Array.isArray(msg.plugins) ? msg.plugins : [];
+    try {
+      writePluginState(this.root, { marketplaces, plugins, done: false, notes: [] });
+    } catch {
+    }
+    reply({});
+    this.installPlugins(readAuth(msg.auth));
+  }
+  /** Установка по сохранённому составу; итог - на диск: отказ не теряется с демоном и повторяется при следующем запуске. */
+  installPlugins(auth) {
+    const state = readPluginState(this.root);
+    if (!state) return;
+    const env = { GIT_TERMINAL_PROMPT: "0", GIT_SSH_COMMAND: "ssh -o BatchMode=yes", ...agentAuthEnv(auth) };
+    this.setupRuns++;
+    this.setup = this.setup.then(async () => {
+      const notes = await installPlugins(this.deps.exec, state, env).catch((e) => [`\u043F\u043B\u0430\u0433\u0438\u043D\u044B Claude \u043D\u0435 \u043F\u043E\u0441\u0442\u0430\u0432\u043B\u0435\u043D\u044B: ${e.message}`]);
+      try {
+        writePluginState(this.root, { ...state, done: true, notes });
+      } catch {
+      }
+    }).finally(() => void this.setupRuns--);
+  }
+  readExtra(msg) {
+    const mcp = typeof msg.mcp === "object" && msg.mcp !== null && !Array.isArray(msg.mcp) ? msg.mcp : {};
+    return { env: readEnv(msg.env, this.deps.home), mcp };
+  }
+  progress(sess, text) {
+    this.pushOutput(sess, Buffer.from(`\x1B[2mCyborg: ${text}\x1B[0m\r
+`));
+  }
+  async prepareAndStart(sess, msg, clones, selected) {
+    const env = { ...GIT_NO_PROMPT, ...gitAuthEnv(sess.auth) };
+    if (sess.closing) return;
+    const cwd = clones[selected].path;
+    this.progress(sess, `\u043A\u043B\u043E\u043D\u0438\u0440\u0443\u044E ${clones[selected].name}\u2026`);
+    const r = await this.deps.exec("git", ["clone", "--", msg.repos[selected].url, cwd], { cwd: import_node_path6.default.dirname(cwd), env });
+    if (r.code !== 0) throw new Error(`git clone ${clones[selected].name}: ${lastLine2(r.stderr)}`);
+    const heads = await this.deps.exec("git", ["ls-remote", "--exit-code", "--heads", "origin", `refs/heads/${msg.branch}`], { cwd, env });
+    if (heads.code !== 0 && heads.code !== 2) throw new Error(`git ls-remote: ${lastLine2(heads.stderr)}`);
+    const sw = await this.deps.exec("git", heads.code === 0 ? ["switch", msg.branch] : ["switch", "-c", msg.branch], { cwd });
+    if (sw.code !== 0) throw new Error(`git switch ${msg.branch}: ${lastLine2(sw.stderr)}`);
+    if (!this.sessions.has(sess.sid) || sess.closing) return;
+    try {
+      writeMemory(this.claude, cwd, msg.memory);
+    } catch (error) {
+      this.progress(sess, `\u043F\u0430\u043C\u044F\u0442\u044C \u043F\u0440\u043E\u0435\u043A\u0442\u0430 \u043D\u0435 \u043F\u0435\u0440\u0435\u043D\u0435\u0441\u0435\u043D\u0430: ${error.message}`);
+    }
+    await this.launch(sess, { prompt: msg.prompt, resume: false });
+  }
+  async wake(conn, sess, msg, reply, fail) {
+    await sess.sleeping;
+    if (sess.meta.state !== "asleep" || sess.closing) return fail("\u0441\u0435\u0441\u0441\u0438\u044F \u043D\u0435 \u0441\u043F\u0438\u0442");
+    const max = DEFAULT_LIMITS.maxPerHost;
+    if (this.liveCount() >= max) return fail(`\u043D\u0430 \u0445\u043E\u0441\u0442\u0435 \u0443\u0436\u0435 ${this.liveCount()} \u0443\u0434\u0430\u043B\u0451\u043D\u043D\u044B\u0445 \u0441\u0435\u0441\u0441\u0438\u0439 (\u043F\u0440\u0435\u0434\u0435\u043B ${max})`);
+    if (!import_node_fs6.default.existsSync(sess.meta.cwd)) return fail("\u043A\u043B\u043E\u043D \u0440\u0430\u0431\u043E\u0447\u0435\u0433\u043E \u0440\u0435\u043F\u043E\u0437\u0438\u0442\u043E\u0440\u0438\u044F \u0441\u0435\u0441\u0441\u0438\u0438 \u0443\u0434\u0430\u043B\u0451\u043D");
+    if (typeof msg.token !== "string" || !msg.token) return fail("\u043D\u0435\u0442 \u0442\u043E\u043A\u0435\u043D\u0430 \u0441\u0435\u0441\u0441\u0438\u0438");
+    const now = this.deps.now();
+    Object.assign(sess, this.makeSess(sess.meta, msg.token, conn, { cols: Number(msg.cols) || 80, rows: Number(msg.rows) || 24 }, readAuth(msg.auth)));
+    sess.extra = this.readExtra(msg);
+    sess.sleeping = void 0;
+    sess.proc = void 0;
+    sess.gone = void 0;
+    Object.assign(sess.meta, { state: "live", origin: "human", spawnedBy: void 0, reported: false, round: sess.meta.round + 1, roundStartedAt: now, lastActive: now });
+    this.saveMeta(sess);
+    reply({ sid: sess.sid, cwd: sess.meta.cwd, clones: sess.meta.clones.map((c) => c.path), round: sess.meta.round });
+    void this.launch(sess, { resume: true }).catch((e) => {
+      this.progress(sess, String(e?.message ?? e));
+      void this.sleep(sess);
+    });
+  }
+  /** Сон: процесс остановлен, mcp.json с токеном удалён, клоны и журнал разговора остаются для wake. */
+  sleep(sess) {
+    sess.sleeping ??= (async () => {
+      sess.meta.state = "asleep";
+      this.saveMeta(sess);
+      await this.stopProc(sess);
+      this.teardownIo(sess);
+      import_node_fs6.default.rmSync(import_node_path6.default.join(sess.dir, "mcp.json"), { force: true });
+      sess.proc = void 0;
+      sess.token = "";
+      sess.auth = { git: [] };
+      sess.extra = { env: {}, mcp: {} };
+      sess.meta.pgid = void 0;
+      this.saveMeta(sess);
+      if (sess.owner?.open) sess.owner.send({ type: "slept", sid: sess.sid });
+      sess.owner = void 0;
+    })();
+    return sess.sleeping;
+  }
+  async launch(sess, opts) {
+    const dir = sess.dir;
+    const file = (name) => import_node_path6.default.join(dir, name);
+    const write = (name, content, mode) => {
+      import_node_fs6.default.writeFileSync(file(name), content, { mode });
+      import_node_fs6.default.chmodSync(file(name), mode);
+    };
+    if (this.setupRuns === 0 && pluginsPending(readPluginState(this.root))) this.installPlugins(sess.auth);
+    if (this.setupRuns > 0) {
+      this.progress(sess, "\u0441\u0442\u0430\u0432\u044F\u0442\u0441\u044F \u043F\u043B\u0430\u0433\u0438\u043D\u044B Claude\u2026");
+      await Promise.race([this.setup, new Promise((resolve) => setTimeout(resolve, SETUP_WAIT_MS).unref())]);
+    }
+    for (const note of readPluginState(this.root)?.notes ?? []) this.progress(sess, note);
+    const port = await this.listenProxy(sess);
+    const voice = await this.listenMic(sess);
+    if (this.stopped || sess.closing || !this.sessions.has(sess.sid)) {
+      this.teardownIo(sess);
+      return;
+    }
+    sess.meta.port = port;
+    this.saveMeta(sess);
+    write("settings.json", JSON.stringify(hookSettings()), 384);
+    write("events.jsonl", "", 384);
+    sess.evOff = 0;
+    const user = hostMcp(sess.extra.mcp, this.deps.home, process.env.PATH ?? "");
+    for (const note of user.skipped) this.progress(sess, note);
+    const cyborg = { type: "http", url: `http://127.0.0.1:${port}/mcp`, headers: { Authorization: `Bearer ${sess.token}` } };
+    write("mcp.json", JSON.stringify({ mcpServers: { ...user.servers, cyborg } }), 384);
+    try {
+      trustClone(this.claude, sess.meta.clones.map((c) => c.path));
+    } catch (error) {
+      this.progress(sess, `\u043A\u0430\u0442\u0430\u043B\u043E\u0433\u0438 \u043A\u043B\u043E\u043D\u043E\u0432 \u043D\u0435 \u043E\u0442\u043C\u0435\u0447\u0435\u043D\u044B \u0434\u043E\u0432\u0435\u0440\u0435\u043D\u043D\u044B\u043C\u0438: ${error.message}`);
+    }
+    const others = sess.meta.clones.filter((c) => c.path !== sess.meta.cwd);
+    const cloned = others.filter((c) => import_node_fs6.default.existsSync(c.path)).map((c) => c.path);
+    const addDirs = cloned.length < others.length ? [...cloned, import_node_path6.default.dirname(sess.meta.cwd)] : cloned;
+    const prompt = remoteSystemPrompt(others);
+    const args = opts.resume && import_node_fs6.default.existsSync(this.journalOf(sess.meta)) ? claudeArgs(addDirs, void 0, sess.sid, prompt) : ["--session-id", sess.sid, ...claudeArgs(addDirs, opts.prompt, void 0, prompt)];
+    write(
+      "launch.sh",
+      `#!/bin/sh
+tty > "$CYBORG_DIR/tty"
+exec claude --settings "$CYBORG_SETTINGS" --mcp-config "$CYBORG_MCP" ${args.map(shQuote).join(" ")}
+`,
+      448
+    );
+    const env = { ...GIT_NO_PROMPT, ...process.env };
+    for (const name of PARENT_SESSION_VARS) delete env[name];
+    Object.assign(env, sess.extra.env, voice ? { PATH: `${voice.bin}:${sess.extra.env.PATH ?? env.PATH ?? ""}`, CYBORG_MIC: voice.sock } : {}, {
+      TERM: "xterm-256color",
+      COLORTERM: "truecolor",
+      CYBORG_DIR: dir,
+      CYBORG_EVENTS: file("events.jsonl"),
+      CYBORG_SETTINGS: file("settings.json"),
+      CYBORG_MCP: file("mcp.json"),
+      ...agentAuthEnv(sess.auth)
+    });
+    this.watchEvents(sess);
+    const proc = this.deps.spawn("script", ["-qfec", `exec /bin/sh ${shQuote(file("launch.sh"))}`, "/dev/null"], { cwd: sess.meta.cwd, env });
+    sess.proc = proc;
+    sess.meta.pgid = proc.pid;
+    sess.meta.launched = true;
+    this.saveMeta(sess);
+    proc.onData((chunk) => {
+      this.pushOutput(sess, chunk);
+      if (sess.size && !sess.prepared) {
+        sess.prepared = true;
+        void this.resize(sess, sess.size.cols, sess.size.rows);
+      }
+    });
+    proc.onExit((code) => sess.proc === proc && void this.onExit(sess, code));
+  }
+  /** Сокет микрофона и подставной arecord сессии; длинный путь сокета либо отказ - сессия без голосового ввода. */
+  async listenMic(sess) {
+    const self = this.deps.self;
+    const sock2 = import_node_path6.default.join(sess.dir, MIC_SOCK);
+    if (!self || Buffer.byteLength(sock2) > SUN_PATH_MAX) return null;
+    const bin = import_node_path6.default.join(sess.dir, MIC_BIN);
+    sess.mic?.close();
+    try {
+      import_node_fs6.default.mkdirSync(bin, { recursive: true, mode: 448 });
+      import_node_fs6.default.writeFileSync(import_node_path6.default.join(bin, "arecord"), arecordScript(self.node, self.script, shQuote), { mode: 448 });
+      import_node_fs6.default.rmSync(sock2, { force: true });
+      const server = micServer(() => {
+        const owner = sess.owner?.open ? sess.owner : void 0;
+        if (!owner) return "Cyborg \u043D\u0435 \u043D\u0430 \u0441\u0432\u044F\u0437\u0438 \u0441 \u0445\u043E\u0441\u0442\u043E\u043C";
+        if (!owner.mic) return "\u0433\u043E\u043B\u043E\u0441\u043E\u0432\u043E\u0439 \u0432\u0432\u043E\u0434 \u0434\u043B\u044F \u044D\u0442\u043E\u0433\u043E \u0445\u043E\u0441\u0442\u0430 \u0432\u044B\u043A\u043B\u044E\u0447\u0435\u043D \u0432 \u0441\u0432\u043E\u0439\u0441\u0442\u0432\u0430\u0445 \u043F\u0440\u043E\u0435\u043A\u0442\u0430 Cyborg";
+        return { forward: owner.mic, sid: sess.sid };
+      });
+      server.on("connection", (socket) => {
+        sess.sockets.add(socket);
+        socket.on("close", () => sess.sockets.delete(socket));
+      });
+      await new Promise((resolve, reject) => {
+        server.once("error", reject);
+        server.listen(sock2, () => resolve());
+      });
+      import_node_fs6.default.chmodSync(sock2, 384);
+      sess.mic = server;
+      return { bin, sock: sock2 };
+    } catch (error) {
+      this.progress(sess, `\u0433\u043E\u043B\u043E\u0441\u043E\u0432\u043E\u0439 \u0432\u0432\u043E\u0434 \u0432 \u0441\u0435\u0441\u0441\u0438\u0438 \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D: ${error.message}`);
+      return null;
+    }
+  }
+  listenProxy(sess) {
+    return new Promise((resolve, reject) => {
+      const server = import_node_net2.default.createServer((socket) => this.proxy(sess, socket));
+      server.once("error", reject);
+      server.listen(0, "127.0.0.1", () => {
+        sess.server = server;
+        resolve(server.address().port);
+      });
+    });
+  }
+  proxy(sess, socket) {
+    sess.sockets.add(socket);
+    socket.on("close", () => sess.sockets.delete(socket));
+    socket.on("error", () => socket.destroy());
+    const fwd = sess.owner?.open ? sess.owner.fwd : void 0;
+    if (fwd) {
+      const up = import_node_net2.default.connect(fwd);
+      up.on("error", () => socket.destroy());
+      socket.on("close", () => up.destroy());
+      socket.pipe(up);
+      up.pipe(socket);
+      return;
+    }
+    answerOffline(socket);
+  }
+  watchEvents(sess) {
+    const file = import_node_path6.default.join(sess.dir, "events.jsonl");
+    const read = () => this.readEvents(sess);
+    try {
+      sess.watcher = import_node_fs6.default.watch(file, read);
+    } catch {
+      sess.watcher = void 0;
+    }
+    setImmediate(read);
+    sess.poll = setInterval(read, 2e3);
+    sess.poll.unref();
+  }
+  readEvents(sess) {
+    const items = this.readLines(sess, sess.evOff, true);
+    if (!items.length) return;
+    const { meta } = sess;
+    for (const { line } of items) {
+      let event;
+      try {
+        event = JSON.parse(line);
+      } catch {
+        continue;
+      }
+      track(sess.tracked, event);
+      const now = this.deps.now();
+      sess.lastHookAt = now;
+      meta.lastActive = now;
+      if (event.hook_event_name === "UserPromptSubmit" && meta.reported) {
+        Object.assign(meta, { reported: false, round: meta.round + 1, roundStartedAt: now });
+        if (sess.owner?.open) sess.owner.send({ type: "round", sid: sess.sid, round: meta.round });
+      }
+    }
+    this.saveMeta(sess, false);
+    if (sess.owner?.open) sess.owner.send({ type: "events", sid: sess.sid, items, replay: false });
+  }
+  /** Полные строки events.jsonl с байтового смещения; advance - сдвинуть общий курсор чтения. */
+  readLines(sess, from, advance) {
+    const file = import_node_path6.default.join(sess.dir, "events.jsonl");
+    let size;
+    try {
+      size = import_node_fs6.default.statSync(file).size;
+    } catch {
+      return [];
+    }
+    if (size <= from) return [];
+    const buf = Buffer.alloc(size - from);
+    const fd = import_node_fs6.default.openSync(file, "r");
+    try {
+      import_node_fs6.default.readSync(fd, buf, 0, buf.length, from);
+    } finally {
+      import_node_fs6.default.closeSync(fd);
+    }
+    const end = buf.lastIndexOf(10);
+    if (end < 0) return [];
+    if (advance) sess.evOff = from + end + 1;
+    const items = [];
+    let start = 0;
+    while (start <= end) {
+      const nl = buf.indexOf(10, start);
+      const text = buf.subarray(start, nl).toString("utf8");
+      if (text.trim()) items.push({ off: from + start, line: text });
+      start = nl + 1;
+    }
+    return items;
+  }
+  pushOutput(sess, chunk) {
+    sess.ring.push(chunk);
+    sess.ringEnd += chunk.length;
+    while (sess.ringEnd - sess.ringStart > RING_BYTES && sess.ring.length > 1) {
+      const dropped = sess.ring.shift();
+      sess.ringStart += dropped.length;
+      sess.modes.feed(dropped);
+    }
+    const text = sess.decoder.write(chunk);
+    if (!text) return;
+    const at = sess.emitted;
+    sess.emitted += Buffer.byteLength(text);
+    if (sess.owner?.open) sess.owner.send({ type: "data", sid: sess.sid, at, data: text });
+  }
+  attach(conn, sess, msg, reply, fail) {
+    if (sess.owner?.open && sess.owner !== conn && sess.owner.instance !== conn.instance) return fail("\u0441\u0435\u0441\u0441\u0438\u044F \u043E\u0442\u043A\u0440\u044B\u0442\u0430 \u0434\u0440\u0443\u0433\u0438\u043C \u043E\u043A\u043D\u043E\u043C Cyborg");
+    if (sess.owner && sess.owner !== conn) sess.owner.open = sess.owner.instance === conn.instance ? false : sess.owner.open;
+    if (sess.meta.state === "asleep") {
+      reply({ sid: sess.sid, cwd: sess.meta.cwd });
+      conn.send({ type: "slept", sid: sess.sid });
+      return;
+    }
+    sess.owner = conn;
+    reply({ sid: sess.sid, cwd: sess.meta.cwd, reported: sess.meta.reported, round: sess.meta.round, ...sess.size });
+    const outFrom = Math.max(0, Number(msg.outFrom) || 0);
+    const bytes = Buffer.concat(sess.ring);
+    let from = outFrom;
+    if (from < sess.ringStart) {
+      conn.send({ type: "reset", sid: sess.sid, at: sess.ringStart, modes: sess.modes.restore() });
+      from = sess.ringStart;
+    }
+    const upto = Math.min(sess.emitted, sess.ringEnd);
+    let begin = from - sess.ringStart;
+    while (begin < upto - sess.ringStart && (bytes[begin] & 192) === 128) begin++;
+    if (begin < upto - sess.ringStart) conn.send({ type: "data", sid: sess.sid, at: sess.ringStart + begin, data: bytes.subarray(begin, upto - sess.ringStart).toString("utf8") });
+    this.sendBacklog(conn, sess, msg.evFrom);
+    if (sess.meta.ended) conn.send({ type: "ended", sid: sess.sid, ...sess.meta.ended });
+    if (sess.exited) {
+      conn.send({ type: "exit", sid: sess.sid, code: sess.exited.code, reason: sess.exited.reason, kept: sess.exited.kept });
+      this.reap(sess);
+    }
+  }
+  sendBacklog(conn, sess, evFrom) {
+    let from = Math.max(this.tailStart(sess), evFrom === "tail" ? 0 : Math.max(0, Number(evFrom) || 0));
+    const file = import_node_path6.default.join(sess.dir, "events.jsonl");
+    if (from > 0) {
+      try {
+        const fd = import_node_fs6.default.openSync(file, "r");
+        try {
+          const prev = Buffer.alloc(1);
+          import_node_fs6.default.readSync(fd, prev, 0, 1, from - 1);
+          if (prev[0] !== 10) {
+            const probe = Buffer.alloc(65536);
+            const n = import_node_fs6.default.readSync(fd, probe, 0, probe.length, from);
+            const nl = probe.subarray(0, n).indexOf(10);
+            from = nl < 0 ? from + n : from + nl + 1;
+          }
+        } finally {
+          import_node_fs6.default.closeSync(fd);
+        }
+      } catch {
+        return;
+      }
+    }
+    const items = this.readLines(sess, from, false);
+    if (items.length) conn.send({ type: "events", sid: sess.sid, items, replay: true });
+  }
+  tailStart(sess) {
+    try {
+      return Math.max(0, import_node_fs6.default.statSync(import_node_path6.default.join(sess.dir, "events.jsonl")).size - EVENTS_TAIL_BYTES);
+    } catch {
+      return 0;
+    }
+  }
+  async resize(sess, cols, rows) {
+    if (!Number.isInteger(cols) || !Number.isInteger(rows) || cols < 1 || rows < 1 || cols > 1e3 || rows > 1e3) return;
+    sess.size = { cols, rows };
+    let tty = "";
+    try {
+      tty = import_node_fs6.default.readFileSync(import_node_path6.default.join(sess.dir, "tty"), "utf8").trim();
+    } catch {
+      return;
+    }
+    if (!/^\/dev\/[A-Za-z0-9/_-]+$/.test(tty)) return;
+    await this.deps.exec("stty", ["-F", tty, "rows", String(rows), "cols", String(cols)]).catch(() => void 0);
+  }
+  async onExit(sess, code) {
+    if (sess.exited || sess.gone) return;
+    sess.gone = true;
+    const rest = sess.decoder.end();
+    if (rest) this.pushOutput(sess, Buffer.from(rest));
+    this.teardownIo(sess);
+    import_node_fs6.default.rmSync(import_node_path6.default.join(sess.dir, "mcp.json"), { force: true });
+    this.readEvents(sess);
+    if (sess.meta.state === "asleep") return;
+    const cleanup = sess.closing ? await sess.closing : sess.meta.keep ? void 0 : await this.cleanClones(sess);
+    sess.exited = { code, kept: cleanup?.kept };
+    this.markDone(sess);
+    this.deliverExit(sess);
+  }
+  /** Завершённая сессия на диске - лишь запись при оставленных клонах: следующий демон её не поднимает. */
+  markDone(sess) {
+    sess.meta.state = "done";
+    sess.meta.pgid = void 0;
+    if (this.clonesOf(sess.sid).length) this.saveMeta(sess);
+  }
+  deliverExit(sess) {
+    const exited = sess.exited;
+    if (exited && sess.owner?.open) {
+      sess.owner.send({ type: "exit", sid: sess.sid, code: exited.code, reason: exited.reason, kept: exited.kept });
+      this.reap(sess);
+    }
+  }
+  reap(sess) {
+    if (!sess.exited || sess.meta.ended || !sess.owner?.open) return;
+    this.sessions.delete(sess.sid);
+    this.pruneDir(sess);
+  }
+  pruneDir(sess) {
+    if (this.clonesOf(sess.sid).length) return;
+    import_node_fs6.default.rmSync(sess.dir, { recursive: true, force: true });
+    import_node_fs6.default.rmSync(import_node_path6.default.join(this.root, "work", sess.sid), { recursive: true, force: true });
+  }
+  teardownIo(sess) {
+    sess.watcher?.close();
+    clearInterval(sess.poll);
+    sess.server?.close();
+    sess.mic?.close();
+    for (const s of sess.sockets) s.destroy();
+    sess.server = void 0;
+    sess.mic = void 0;
+  }
+  async failStart(sess, reason) {
+    if (sess.exited) return;
+    this.progress(sess, reason);
+    const cleanup = await this.cleanClones(sess, true);
+    this.teardownIo(sess);
+    sess.exited = { code: 1, reason, kept: cleanup.kept };
+    sess.meta.state = "done";
+    if (sess.meta.origin === "tool") {
+      sess.meta.ended = { status: "failed", reason, cleanup };
+      this.saveMeta(sess);
+      if (sess.owner?.open) sess.owner.send({ type: "ended", sid: sess.sid, ...sess.meta.ended });
+    }
+    this.deliverExit(sess);
+  }
+  /**
+   * Завершение: процесс останавливается, клоны без keep убираются. Повторный вызов ждёт тот же результат.
+   * Начатая уборка записана в мету: упавший посреди неё демон доделает её при старте.
+   */
+  close(sess, keep, reason, force = false) {
+    sess.closing ??= Promise.resolve().then(async () => {
+      await sess.sleeping;
+      sess.meta.closing = reason ? { keep, reason } : { keep };
+      this.saveMeta(sess);
+      await this.stopProc(sess);
+      this.teardownIo(sess);
+      import_node_fs6.default.rmSync(import_node_path6.default.join(sess.dir, "mcp.json"), { force: true });
+      const result = keep ? { removed: [], kept: this.clonesOf(sess.sid).map((c) => ({ path: c.path, reason: "\u043E\u0441\u0442\u0430\u0432\u043B\u0435\u043D \u043F\u043E keep" })) } : await this.cleanClones(sess, force);
+      sess.meta.closing = void 0;
+      if (!sess.proc) {
+        this.markDone(sess);
+        this.sessions.delete(sess.sid);
+      }
+      return result;
+    });
+    return sess.closing;
+  }
+  async stopProc(sess) {
+    const proc = sess.proc;
+    if (!proc || sess.exited || sess.gone) return;
+    const pid = proc.pid;
+    if (!pid) return;
+    const gone = new Promise((resolve) => proc.onExit(() => resolve()));
+    this.deps.killGroup(pid, "SIGTERM");
+    const timer = new Promise((resolve) => {
+      const t = setTimeout(() => {
+        this.deps.killGroup(pid, "SIGKILL");
+        resolve();
+      }, this.deps.killGraceMs ?? 1e4);
+      t.unref();
+    });
+    await Promise.race([gone, timer]);
+  }
+  async cleanClones(sess, force = false) {
+    const result = { removed: [], kept: [] };
+    for (const clone of this.clonesOf(sess.sid)) {
+      const reason = force ? null : await this.dirtyReason(clone.path);
+      if (reason) result.kept.push({ path: clone.path, reason });
+      else {
+        await import_node_fs6.default.promises.rm(clone.path, { recursive: true, force: true });
+        result.removed.push(clone.path);
+      }
+    }
+    this.pruneDir(sess);
+    return result;
+  }
+  async dirtyReason(clone) {
+    const run3 = (args, cwd = clone) => this.deps.exec("git", ["-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false", ...args], { cwd, timeoutMs: GIT_PROBE_TIMEOUT_MS });
+    const trees = await run3(["worktree", "list", "--porcelain"]);
+    const paths = trees.code === 0 ? trees.stdout.split("\n").filter((l) => l.startsWith("worktree ")).map((l) => l.slice(9)) : [clone];
+    for (const tree of paths.length ? paths : [clone]) {
+      const status = await run3(["status", "--porcelain=v1", "--untracked-files=all"], tree);
+      if (status.code !== 0) return UNCHECKED_CLONE;
+      if (status.stdout.trim()) return "\u0438\u0437\u043C\u0435\u043D\u0435\u043D\u0438\u044F \u0432 \u0440\u0430\u0431\u043E\u0447\u0435\u043C \u0434\u0435\u0440\u0435\u0432\u0435";
+    }
+    for (const tree of paths.length ? paths : [clone]) {
+      const head = await run3(["rev-parse", "--verify", "--quiet", "HEAD"], tree);
+      if (head.code > 1) return UNCHECKED_CLONE;
+      const ahead = await run3(["rev-list", "--count", "--branches", ...head.code === 0 ? ["HEAD"] : [], "--not", "--remotes"], tree);
+      if (ahead.code !== 0) return UNCHECKED_CLONE;
+      if (Number(ahead.stdout.trim()) !== 0) return "\u043D\u0435\u0437\u0430\u043F\u0443\u0448\u0435\u043D\u043D\u044B\u0435 \u043A\u043E\u043C\u043C\u0438\u0442\u044B";
+    }
+    const stash = await run3(["stash", "list"]);
+    if (stash.code !== 0) return UNCHECKED_CLONE;
+    if (stash.stdout.trim()) return "stash";
+    return null;
+  }
+  async enforceLimits() {
+    const now = this.deps.now();
+    const sleepMs = this.deps.sleepMs ?? SLEEP_IDLE_MS;
+    for (const sess of [...this.sessions.values()]) {
+      const { meta } = sess;
+      if (meta.state !== "live" || sess.exited || sess.gone || sess.closing || sess.sleeping) continue;
+      if (sess.proc && sess.tracked.state === "waiting" && now - meta.lastActive > sleepMs) {
+        await this.sleep(sess);
+        continue;
+      }
+      if (meta.origin !== "tool" || meta.reported) continue;
+      const { taskMs, idleMs } = meta.limits;
+      let reason = null;
+      if (now - meta.roundStartedAt > taskMs) reason = `\u043F\u0440\u0435\u0432\u044B\u0448\u0435\u043D \u0442\u0430\u0439\u043C\u0430\u0443\u0442 \u0437\u0430\u0434\u0430\u0447\u0438 ${fmtDuration(taskMs)}`;
+      else if (sess.tracked.state === "working" && now - sess.lastHookAt > idleMs) reason = `\u043F\u0440\u043E\u0441\u0442\u043E\u0439 ${fmtDuration(idleMs)} \u0431\u0435\u0437 \u0441\u043E\u0431\u044B\u0442\u0438\u0439 \u0432 working`;
+      if (!reason) continue;
+      const cleanup = await this.close(sess, false, reason);
+      this.settleEnded(sess, { status: "failed", reason, cleanup });
+    }
+  }
+  /** create=false - не заводить каталог заново, если уборка его уже сняла. */
+  saveMeta(sess, create = true) {
+    const file = import_node_path6.default.join(sess.dir, "meta.json");
+    if (!create && !import_node_fs6.default.existsSync(sess.dir)) return;
+    import_node_fs6.default.mkdirSync(sess.dir, { recursive: true, mode: 448 });
+    import_node_fs6.default.writeFileSync(file, JSON.stringify(sess.meta), { mode: 384 });
+    import_node_fs6.default.chmodSync(file, 384);
+  }
+  /** Настоящий путь внутри каталога сессии: ссылка наружу и «..» отвергаются; missing - отведённый клон, которого агент ещё не сделал. */
+  clonePath(sess, target) {
+    const outside = { error: "\u041F\u0443\u0442\u044C \u0432\u043D\u0435 \u043A\u0430\u0442\u0430\u043B\u043E\u0433\u043E\u0432 \u0443\u0434\u0430\u043B\u0451\u043D\u043D\u043E\u0439 \u0441\u0435\u0441\u0441\u0438\u0438" };
+    if (!import_node_path6.default.isAbsolute(target) || target.split("/").includes("..")) return outside;
+    if (!import_node_fs6.default.existsSync(target) && sess.meta.clones.some((c) => c.path === target)) return { missing: true };
+    let work;
+    let real;
+    try {
+      work = import_node_fs6.default.realpathSync(import_node_path6.default.join(this.root, "work", sess.sid));
+      real = import_node_fs6.default.realpathSync(target);
+    } catch (e) {
+      return { error: e.message };
+    }
+    return real === work || real.startsWith(work + import_node_path6.default.sep) ? { real } : outside;
+  }
+  /** Поиск по содержимому и изменениям клона теми же командами, что у локальной сессии; новый запрос того же корня отменяет прежний. */
+  async search(sess, mode, value) {
+    const request = validateSearchRequest(value);
+    if (mode !== "text" && mode !== "changes" || !request) return { error: "\u041D\u0435\u043A\u043E\u0440\u0440\u0435\u043A\u0442\u043D\u044B\u0435 \u0430\u0440\u0433\u0443\u043C\u0435\u043D\u0442\u044B \u043F\u043E\u0438\u0441\u043A\u0430" };
+    const at = this.clonePath(sess, request.root);
+    const empty2 = { hits: [], truncated: false };
+    if ("missing" in at) return { value: empty2 };
+    if ("error" in at) return at;
+    const work = { ...request, root: at.real };
+    const run3 = (signal) => mode === "text" ? gitGrep(work, signal) : gitDiffSearch(work, signal);
+    return { value: await this.searches.run(`${sess.sid}:${mode}:${at.real}`, run3, empty2).catch((e) => ({ ...empty2, error: e.message })) };
+  }
+  async fsOp(sess, op, target) {
+    const at = this.clonePath(sess, target);
+    if ("missing" in at) return op === "files" || op === "list" ? { value: [] } : op === "status" ? { value: {} } : op === "root" || op === "branch" ? { value: null } : { error: "\u0440\u0435\u043F\u043E\u0437\u0438\u0442\u043E\u0440\u0438\u0439 \u0435\u0449\u0451 \u043D\u0435 \u0441\u043A\u043B\u043E\u043D\u0438\u0440\u043E\u0432\u0430\u043D" };
+    if ("error" in at) return at;
+    const { real } = at;
+    switch (op) {
+      case "files":
+        return { value: await gitFiles(real) ?? await walkFiles(real) };
+      case "list":
+        return { value: await listDir(real).catch((e) => ({ error: e.message })) };
+      case "read":
+        return { value: await readTextFile(real) };
+      case "root":
+        return { value: await gitRoot(real) };
+      case "branch":
+        return { value: await gitBranch(real) };
+      case "status":
+        return { value: await gitStatus(real) };
+      case "head":
+        return { value: await gitHeadContent(real) };
+      default:
+        return { error: `\u043D\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043D\u0430\u044F \u043E\u043F\u0435\u0440\u0430\u0446\u0438\u044F ${op}` };
+    }
+  }
+};
+var GIT_NO_PROMPT = { GIT_TERMINAL_PROMPT: "0", GIT_SSH_COMMAND: "ssh -o BatchMode=yes" };
+var PARENT_SESSION_VARS = [
+  "CLAUDECODE",
+  "CLAUDE_CODE_CHILD_SESSION",
+  "CLAUDE_CODE_ENTRYPOINT",
+  "CLAUDE_CODE_EXECPATH",
+  "CLAUDE_CODE_SESSION_ATTENDED",
+  "CLAUDE_CODE_SESSION_ID",
+  "CLAUDE_CODE_MESSAGING_SOCKET",
+  "CLAUDE_CODE_MESSAGING_TOKEN",
+  "CLAUDE_EFFORT",
+  "CLAUDE_PID"
+];
+function uniqueNames(names2) {
+  const seen = /* @__PURE__ */ new Map();
+  return names2.map((name) => {
+    const n = (seen.get(name) ?? 0) + 1;
+    seen.set(name, n);
+    return n === 1 ? name : `${name}-${n}`;
+  });
+}
+var SID = /^[0-9a-f-]{8,64}$/;
+var DU_TIMEOUT_MS = 2e4;
+var GIT_PROBE_TIMEOUT_MS = 2e4;
+var DISK_POOL = 4;
+var DISK_BUDGET_MS = 9e4;
+var UNCHECKED_CLONE = "\u043A\u043B\u043E\u043D \u043D\u0435 \u043F\u0440\u043E\u0432\u0435\u0440\u0435\u043D: git \u0437\u0430\u0432\u0435\u0440\u0448\u0438\u043B\u0441\u044F \u0441 \u043E\u0448\u0438\u0431\u043A\u043E\u0439 \u0438\u043B\u0438 \u043D\u0435 \u043E\u0442\u0432\u0435\u0442\u0438\u043B";
+var SETUP_WAIT_MS = 10 * 6e4;
+var lastLine2 = (text) => text.trim().split("\n").pop()?.slice(0, 300) || "\u0431\u0435\u0437 \u043F\u043E\u044F\u0441\u043D\u0435\u043D\u0438\u044F";
+function fmtDuration(ms) {
+  const min = Math.round(ms / 6e4);
+  return min % 60 === 0 && min >= 60 ? `${min / 60} \u0447` : `${min} \u043C\u0438\u043D`;
+}
+function answerOffline(socket) {
+  let buf = Buffer.alloc(0);
+  let answered = false;
+  const send = (status, body) => {
+    if (answered) return;
+    answered = true;
+    const text = body === void 0 ? "" : JSON.stringify(body);
+    socket.end(`HTTP/1.1 ${status} ${status === 200 ? "OK" : "Error"}\r
+Content-Type: application/json\r
+Content-Length: ${Buffer.byteLength(text)}\r
+Connection: close\r
+\r
+${text}`);
+  };
+  socket.on("data", (chunk) => {
+    if (answered) return;
+    buf = Buffer.concat([buf, chunk]);
+    const headEnd = buf.indexOf("\r\n\r\n");
+    if (headEnd < 0) return buf.length > 64 * 1024 ? send(431) : void 0;
+    const length = Number(/^content-length:\s*(\d+)/im.exec(buf.subarray(0, headEnd).toString("latin1"))?.[1] ?? 0);
+    if (length > MAX_PROXY_BODY) return send(413);
+    if (buf.length < headEnd + 4 + length) return;
+    let message;
+    try {
+      message = JSON.parse(buf.subarray(headEnd + 4, headEnd + 4 + length).toString("utf8"));
+    } catch {
+      return send(400);
+    }
+    if (message.method === "tools/call") return send(200, { jsonrpc: "2.0", id: message.id ?? null, result: { content: [{ type: "text", text: OFFLINE_TEXT }], isError: true } });
+    send(503);
+  });
+}
+
+// companions/agentd/src/agentd/agentd.ts
+var IDLE_EXIT_MS = 10 * 6e4;
+var home = import_node_os.default.homedir();
+var run2 = import_node_path7.default.join(home, ".cyborg", "run");
+var sock = import_node_path7.default.join(run2, "agentd.sock");
+var lock = import_node_path7.default.join(run2, "agentd.lock");
+var alive = (pid) => {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+};
+function lockHolderAlive(pid) {
+  if (!alive(pid)) return false;
+  try {
+    const argv = import_node_fs7.default.readFileSync(`/proc/${pid}/cmdline`, "utf8").split("\0");
+    return argv.some((a) => a.endsWith("agentd.js")) && argv.includes("serve");
+  } catch {
+    return true;
+  }
+}
+function takeLock() {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      import_node_fs7.default.writeFileSync(lock, String(process.pid), { flag: "wx", mode: 384 });
+      return true;
+    } catch {
+      const pid = Number(import_node_fs7.default.readFileSync(lock, "utf8"));
+      if (pid && lockHolderAlive(pid)) return false;
+      import_node_fs7.default.rmSync(lock, { force: true });
+    }
+  }
+  return false;
+}
+function quit() {
+  import_node_fs7.default.rmSync(sock, { force: true });
+  import_node_fs7.default.rmSync(lock, { force: true });
+  process.exit(0);
+}
+function groupOwned(pgid, marker) {
+  if (!alive(pgid)) return false;
+  try {
+    return import_node_fs7.default.readFileSync(`/proc/${pgid}/cmdline`, "utf8").includes(marker);
+  } catch {
+    return false;
+  }
+}
+async function serve() {
+  import_node_fs7.default.mkdirSync(run2, { recursive: true, mode: 448 });
+  if (!takeLock()) return;
+  import_node_fs7.default.rmSync(sock, { force: true });
+  const daemon = new Daemon({
+    home,
+    version: import_node_path7.default.basename(import_node_path7.default.dirname(process.argv[1])),
+    now: () => Date.now(),
+    spawn: (file, args, opts) => {
+      const child = (0, import_node_child_process4.spawn)(file, args, { cwd: opts.cwd, env: opts.env, detached: true, stdio: ["pipe", "pipe", "ignore"] });
+      child.stdin.on("error", () => void 0);
+      return {
+        pid: child.pid,
+        write: (data) => void child.stdin.write(data),
+        onData: (cb) => void child.stdout.on("data", cb),
+        onExit: (cb) => void child.on("close", (code) => cb(code ?? 1))
+      };
+    },
+    exec: (file, args, opts) => new Promise((resolve) => {
+      (0, import_node_child_process4.execFile)(file, args, { cwd: opts?.cwd, env: { ...process.env, ...opts?.env }, maxBuffer: 16 * 1024 * 1024, timeout: opts?.timeoutMs ?? 0 }, (error, stdout, stderr) => {
+        const code = error ? typeof error.code === "number" ? error.code : 1 : 0;
+        resolve({ code, stdout: String(stdout), stderr: String(stderr || (error ? error.message : "")) });
+      });
+    }),
+    onShutdown: () => quit(),
+    self: { node: process.execPath, script: process.argv[1] },
+    claudeConfigDir: process.env.CLAUDE_CONFIG_DIR || void 0,
+    sleepMs: Number(process.env.CYBORG_SLEEP_MS) || void 0,
+    groupOwned,
+    killGroup: (pgid, signal) => {
+      try {
+        process.kill(-pgid, signal);
+      } catch {
+      }
+    }
+  });
+  await daemon.init();
+  const server = import_node_net3.default.createServer((socket) => {
+    const conn = daemon.connect({ send: (msg) => void socket.write(JSON.stringify(msg) + "\n") });
+    socket.on("data", lineReader((line) => {
+      try {
+        conn.receive(JSON.parse(line));
+      } catch {
+      }
+    }));
+    socket.on("close", () => conn.close());
+    socket.on("error", () => socket.destroy());
+  });
+  server.listen(sock, () => import_node_fs7.default.chmodSync(sock, 384));
+  let idleSince = Date.now();
+  setInterval(() => {
+    if (!daemon.idle()) idleSince = Date.now();
+    else if (Date.now() - idleSince > IDLE_EXIT_MS) quit();
+  }, 3e4);
+  process.on("SIGTERM", quit);
+}
+function lineReader(onLine) {
+  let parts = [];
+  return (chunk) => {
+    let start = 0;
+    let nl;
+    while ((nl = chunk.indexOf(10, start)) >= 0) {
+      parts.push(chunk.subarray(start, nl));
+      const line = Buffer.concat(parts).toString("utf8");
+      parts = [];
+      start = nl + 1;
+      onLine(line);
+    }
+    if (start < chunk.length) parts.push(chunk.subarray(start));
+  };
+}
+function dial() {
+  return new Promise((resolve) => {
+    const socket = import_node_net3.default.connect(sock);
+    socket.once("connect", () => resolve(socket));
+    socket.once("error", () => resolve(null));
+  });
+}
+async function connect() {
+  let socket = await dial();
+  if (!socket) {
+    import_node_fs7.default.mkdirSync(run2, { recursive: true, mode: 448 });
+    (0, import_node_child_process4.spawn)(process.execPath, [process.argv[1], "serve"], { detached: true, stdio: "ignore" }).unref();
+    for (let i = 0; i < 50 && !socket; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      socket = await dial();
+    }
+  }
+  if (!socket) {
+    process.stderr.write("\u0430\u0433\u0435\u043D\u0442 Cyborg \u043D\u0430 \u0445\u043E\u0441\u0442\u0435 \u043D\u0435 \u0437\u0430\u043F\u0443\u0441\u0442\u0438\u043B\u0441\u044F\n");
+    process.exit(1);
+  }
+  process.stdin.pipe(socket);
+  socket.pipe(process.stdout);
+  socket.on("close", () => process.exit(0));
+  process.stdin.on("end", () => socket.end());
+}
+if (process.argv[2] === "serve") void serve();
+else if (process.argv[2] === "connect") void connect();
+else if (process.argv[2] === "arecord") void arecord(process.argv.slice(3), process.env, import_node_path7.default.join(import_node_path7.default.dirname(process.env.CYBORG_MIC ?? ""), MIC_BIN)).then((code) => process.exit(code));
+// Annotate the CommonJS export names for ESM import in node:
+0 && (module.exports = {
+  groupOwned,
+  lineReader,
+  lockHolderAlive
+});

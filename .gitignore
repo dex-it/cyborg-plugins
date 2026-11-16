@@ -9,3 +9,4 @@ site/src/generated/
 site/public/favicon.svg
 .ai-cyborg/
 docs/guide/catalog/
+.claude/worktrees/

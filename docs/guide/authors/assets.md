@@ -64,7 +64,7 @@ description: "Что из каталога плагина доезжает до 
 
 Демон ai-cyborg уже ставится текстом: `ssh host sh -s` получает скрипт установки с содержимым демона и проверкой `sha256` (`src/main/remote/install.ts`). На ядре то же: текст демона берётся из `ASSETS['agentd/agentd.js']`, отправляется через `ctx.os.process.run('ssh', [...], { input })` по правилу `process` на `ssh`. Хеш для проверки на хосте - `ASSET_VERSION` или `sha256` текста.
 
-Исходники демона на TypeScript с `node:*` в каталоге плагина лежать не могут. Их собирают отдельно (esbuild в один файл) из каталога вне плагина, например `companions/agentd/`, а результат кладут в `assets/agentd/agentd.js.txt`. Скрипт сборки таких программ появится вместе с `remote-sessions` (M-05).
+Исходники демона на TypeScript с `node:*` в каталоге плагина лежать не могут. Их собирают отдельно (esbuild в один файл) из каталога вне плагина, например `companions/agentd/`, а результат кладут в `assets/agentd/agentd.js.txt`. Скрипт сборки - `npm run build:companions` (`companions/agentd/scripts/build.mjs`, esbuild, точки входа и файлы ресурсов перечислены в `ENTRIES`): он кладёт результат в `assets/agentd/agentd.js.txt` и `client.js.txt` плагина `remote-sessions`, затем `npm run embed-assets -- plugins/sessions/remote-sessions` вшивает их в `assets.generated.ts`. Тест плагина сверяет ресурсы со свежей сборкой, так что устаревший демон не доедет до поставки молча. Тесты программ лежат рядом (`companions/agentd/test`, `node companions/agentd/scripts/test.mjs`) и идут в `npm test` плагина.
 
 ### Monaco, шрифты и стили вида
 
