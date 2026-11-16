@@ -3,6 +3,12 @@
   "properties": {
     "instance": {
       "type": "string"
+    },
+    "sessions": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
     }
   },
   "additionalProperties": false

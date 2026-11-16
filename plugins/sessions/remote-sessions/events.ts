@@ -42,14 +42,14 @@ export function waitingReason(hook: HookEvent): string | null {
   return WAITING.get(hook.notification_type ?? '') ?? null;
 }
 
-/** Одно событие хука - не более одного события контракта; смена cwd идёт перед ним. `resumeId` называет сессию так, как её открывает `launch` (`<sid>@<хост>`). */
-export function translate(hook: HookEvent, cwd: string | undefined, resumeId: (id: string) => string): AgentEvent[] {
+/** Одно событие хука - не более одного события контракта; смена cwd идёт перед ним. `session_id` хука - идентификатор сессии на хосте (демон запускает claude с `--session-id <sid>`), он и есть `resumeId`. */
+export function translate(hook: HookEvent, cwd: string | undefined): AgentEvent[] {
   const out: AgentEvent[] = hook.cwd && hook.cwd !== cwd ? [{ type: 'cwd', cwd: hook.cwd }] : [];
   const name = hook.hook_event_name;
   if (name === 'UserPromptSubmit') {
     out.push({ type: 'prompt' });
   } else if (name === 'SessionStart') {
-    if (typeof hook.session_id === 'string' && SESSION_ID.test(hook.session_id)) out.push({ type: 'session', resumeId: resumeId(hook.session_id) });
+    if (typeof hook.session_id === 'string' && SESSION_ID.test(hook.session_id)) out.push({ type: 'session', resumeId: hook.session_id });
   } else if (name === 'Stop') {
     const background = (hook.background_tasks?.length ?? 0) > 0 || (hook.session_crons?.length ?? 0) > 0;
     out.push({ type: 'turnEnd', background, ...(typeof hook.last_assistant_message === 'string' && { text: hook.last_assistant_message }) });

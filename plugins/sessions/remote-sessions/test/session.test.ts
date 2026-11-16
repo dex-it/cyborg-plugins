@@ -31,8 +31,10 @@ describe('создание и запуск удалённой сессии на 
     await using r = await rig({ repos: true });
     assert.ok(r.repos);
     const info = (await r.call('remote-sessions.create', 'p1', { host: 'dev1', repo: r.repos.work.dir, branch: 'feat/x' })) as Info;
-    assert.match(info.resumeId, /^[0-9a-f-]{36}@dev1$/);
-    assert.equal(info.resumeId, `${info.sid}@dev1`);
+    // resumeId проходит проверку плагина sessions (id сессии: буквы, цифры, «_», «-», до 64 знаков) и равен номеру сессии на хосте.
+    assert.match(info.resumeId, /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/);
+    assert.equal(info.resumeId, info.sid);
+    assert.equal((r.state.docs.get('workspace')?.['remote-sessions'] as { sessions?: Record<string, string> } | undefined)?.sessions?.[info.sid], 'dev1', 'хост сессии запомнен в state');
     assert.deepEqual(info.dirs, [r.repos.work.dir]);
     assert.ok(info.cwd.startsWith(r.cyborg('work', info.sid)), info.cwd);
     assert.deepEqual(info.roots, [info.cwd]);
@@ -79,17 +81,30 @@ describe('создание и запуск удалённой сессии на 
     assert.deepEqual(r.kernel.journal.filter((e) => e.kind === 'denied' || e.kind === 'failed'), []);
   });
 
-  it('launch отвергает хост вне проектов, сессию, которой нет на хосте, и resumeId чужой формы - без цели терминал печатает причину', async () => {
+  it('launch: сессии, которой нет на хостах проектов, - отказ; resumeId чужой формы (флаг, «@хост», не UUID) - терминал печатает причину', async () => {
     await using r = await rig({ repos: true });
     assert.ok(r.repos);
     const cwd = r.repos.work.dir;
-    await assert.rejects(r.agent.launch({ sessionId: 't', cwd, resumeId: '11111111-1111-1111-1111-111111111111@evil' }), /хост не из списка/);
-    await assert.rejects(r.agent.launch({ sessionId: 't', cwd, resumeId: '11111111-1111-1111-1111-111111111111@dev1' }), /не найдена на dev1/);
-    for (const resumeId of [undefined, 'abc', '-oProxyCommand=x@dev1', 'не@uuid']) {
+    await assert.rejects(r.agent.launch({ sessionId: 't', cwd, resumeId: '11111111-1111-1111-1111-111111111111' }), /не найдена на хостах проектов/);
+    for (const resumeId of [undefined, 'abc', '-oProxyCommand=x', '11111111-1111-1111-1111-111111111111@evil', 'не@uuid']) {
       const spec = await r.agent.launch({ sessionId: 't', cwd, ...(resumeId !== undefined && { resumeId }) });
       assert.equal(spec.program, '$SHELL', String(resumeId));
       assert.equal(spec.args[1], manifest.permissions.launch[1]?.args[1]);
     }
+  });
+
+  it('history: контракт cyborg.agent видит и спящие, и живые сессии проекта (подхват - тоже продолжение), команда history:remote - только спящие', async () => {
+    await using r = await rig({ repos: true });
+    assert.ok(r.repos);
+    const cwd = r.repos.work.dir;
+    const info = (await r.call('remote-sessions.create', 'p1', { host: 'dev1', repo: cwd, branch: 'h1' })) as Info;
+    await until('сессия запущена', () => existsSync(r.cyborg('sessions', info.sid, 'events.jsonl')));
+    const entries = await r.agent.history(cwd);
+    assert.deepEqual(entries.map((e) => [e.id, e.cwd]), [[info.sid, cwd]]);
+    assert.match(entries[0]?.title ?? '', /^работает: /);
+    assert.deepEqual(await r.agent.history('/другой/каталог'), []);
+    const remote = (await r.call('remote-sessions.history', 'p1')) as { entries: unknown[]; unreachable: unknown[] };
+    assert.deepEqual(remote, { entries: [], unreachable: [] });
   });
 
   it('терминал из launch (ssh -tt ... attach): вывод claude, ввод доходит до него, обрыв ssh не убивает сессию, новый launch подхватывает её с прежним выводом', async () => {
@@ -177,7 +192,7 @@ describe('создание и запуск удалённой сессии на 
     const first = made[0] as Info;
     assert.match((await r.call('remote-sessions.close', first.resumeId, false)) as string, /Сессия [0-9a-f]{8} завершена/);
     const again = await make('l5');
-    assert.match(again.resumeId, /@dev1$/);
+    assert.match(again.resumeId, /^[0-9a-f-]{36}$/);
   });
 
   it('close без keep убирает клоны, с keep оставляет; remote:purge убирает оставленные клоны (грязные - только с force), работающую не трогает', async () => {

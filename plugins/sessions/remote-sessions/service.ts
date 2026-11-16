@@ -22,19 +22,12 @@ import type { Auth, CleanupResult, GitCred, RepoSpec } from './protocol.ts';
 /** Идентификатор сессии на хосте: UUID, как у isSessionId в ai-cyborg. */
 export const SESSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
-/** `<sid>@<хост>`: sid - hex и дефисы, поэтому первый «@» делит имя однозначно (в алиасе «@» бывает: `user@host`). */
-export function resumeIdOf(sid: string, host: string): string {
-  return `${sid}@${host}`;
-}
-
-export function parseResumeId(resumeId: unknown): { sid: string; host: string } | null {
-  if (typeof resumeId !== 'string') return null;
-  const at = resumeId.indexOf('@');
-  if (at < 0) return null;
-  const sid = resumeId.slice(0, at);
-  const host = resumeId.slice(at + 1);
-  return SESSION_ID.test(sid) && host !== '' ? { sid, host } : null;
-}
+/**
+ * Сессию называет `resumeId` = её идентификатор на хосте (UUID; он же номер разговора claude: демон запускает его с `--session-id`).
+ * Такая форма проходит проверку `sessions` (`^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$`) и совпадает с `session_id` события `SessionStart`.
+ * Хост по идентификатору находит `locate`: по запомненной связи, иначе опросом хостов проектов.
+ */
+export const resumeIdOf = (sid: string): string => sid;
 
 export interface HistoryEntryOut {
   id: string;
@@ -76,6 +69,11 @@ export interface ServiceDeps {
   uuid(): string;
   /** Случайная строка для токена сессии (в ai-cyborg - токен MCP; туннеля нет, демон требует непустой). */
   secret(): string;
+  /** Хост, на котором сессия видна в последний раз: запоминается при создании, пробуждении и опросе; нет - undefined. */
+  hostOf(sid: string): string | undefined;
+  remember(sid: string, host: string): void;
+  /** Хосты всех проектов: сюда можно ходить по ssh. */
+  aliases(): string[];
   /** Предел ожидания хоста для «Истории», мс. */
   historyTimeoutMs?: number;
 }
@@ -192,8 +190,9 @@ export class RemoteService {
     });
     const roots = Array.isArray(reply.clones) ? (reply.clones as string[]) : [];
     const cwd = String(reply.cwd ?? args.repo);
+    this.deps.remember(sid, args.host);
     return {
-      resumeId: resumeIdOf(sid, args.host),
+      resumeId: resumeIdOf(sid),
       sid,
       host: args.host,
       dirs,
@@ -223,7 +222,8 @@ export class RemoteService {
           if (item.busy === true || item.asleep === true || item.exited === true || !SESSION_ID.test(sid) || !Array.isArray(dirs) || !sameDirs(dirs as string[], project.repos)) continue;
           const clones = Array.isArray(item.clones) ? (item.clones as string[]) : [];
           const cwd = String(item.cwd);
-          sessions.push({ resumeId: resumeIdOf(sid, alias), sid, host: alias, dirs: dirs as string[], cwd, roots: [cwd, ...clones.filter((r) => r !== cwd)], reported: item.reported === true });
+          this.deps.remember(sid, alias);
+          sessions.push({ resumeId: resumeIdOf(sid), sid, host: alias, dirs: dirs as string[], cwd, roots: [cwd, ...clones.filter((r) => r !== cwd)], reported: item.reported === true });
         }
       } catch (error) {
         unreachable.push({ host: alias, reason: error instanceof Error ? error.message : String(error) });
@@ -239,7 +239,8 @@ export class RemoteService {
     return this.historyOf(project);
   }
 
-  async historyOf(project: ProjectView): Promise<RemoteHistory> {
+  /** `live` - и живые сессии проекта, не занятые другим окном: контракт `cyborg.agent` продолжает сессию только из `history`, а подхват живой - тоже продолжение. */
+  async historyOf(project: ProjectView, live = false): Promise<RemoteHistory> {
     const limit = this.deps.historyTimeoutMs ?? HISTORY_TIMEOUT_MS;
     const out: RemoteHistory = { entries: [], unreachable: [] };
     await Promise.all(
@@ -249,7 +250,7 @@ export class RemoteService {
           timer = setTimeout(() => reject(new Error(`хост не ответил за ${String(Math.round(limit / 1000))} с`)), limit);
         });
         try {
-          const found = this.asleepOn(project, alias);
+          const found = this.entriesOn(project, alias, live);
           // Опоздавший ответ не должен падать необработанным отказом.
           found.catch(() => undefined);
           out.entries.push(...(await Promise.race([found, late])));
@@ -263,14 +264,17 @@ export class RemoteService {
     return out;
   }
 
-  private async asleepOn(project: ProjectView, alias: string): Promise<(HistoryEntryOut & { host: string })[]> {
+  private async entriesOn(project: ProjectView, alias: string, live: boolean): Promise<(HistoryEntryOut & { host: string })[]> {
     const found: (HistoryEntryOut & { host: string })[] = [];
     for (const item of await this.listOf(this.deps.host(alias))) {
       const dirs = item.dirs;
       const sid = String(item.sid);
-      if (item.asleep !== true || !SESSION_ID.test(sid) || !Array.isArray(dirs) || !sameDirs(dirs as string[], project.repos)) continue;
-      const title = hostText(item.title) || hostText(item.branch) || sid.slice(0, 8);
-      found.push({ id: resumeIdOf(sid, alias), cwd: String((dirs as string[])[0]), title, updated: Number(item.lastActive) || 0, host: alias });
+      const sleeping = item.asleep === true;
+      const open = live && !sleeping && item.exited !== true && item.busy !== true;
+      if ((!sleeping && !open) || !SESSION_ID.test(sid) || !Array.isArray(dirs) || !sameDirs(dirs as string[], project.repos)) continue;
+      const title = (open ? 'работает: ' : '') + (hostText(item.title) || hostText(item.branch) || sid.slice(0, 8));
+      this.deps.remember(sid, alias);
+      found.push({ id: resumeIdOf(sid), cwd: String((dirs as string[])[0]), title, updated: Number(item.lastActive) || 0, host: alias });
     }
     return found;
   }
@@ -297,7 +301,8 @@ export class RemoteService {
     const reply = await host.request({ type: 'wake', sid, token: this.deps.secret(), ...START_SIZE, auth });
     const roots = Array.isArray(reply.clones) ? (reply.clones as string[]) : [];
     const cwd = String(reply.cwd ?? cwd0);
-    return { resumeId: resumeIdOf(sid, host.host), sid, host: host.host, dirs, cwd, roots: [cwd, ...roots.filter((r) => r !== cwd)], reported: false, notes: this.notes(host, urls, auth) };
+    this.deps.remember(sid, host.host);
+    return { resumeId: resumeIdOf(sid), sid, host: host.host, dirs, cwd, roots: [cwd, ...roots.filter((r) => r !== cwd)], reported: false, notes: this.notes(host, urls, auth) };
   }
 
   /** remote:disk. Место на хосте и его сессии. */
@@ -324,27 +329,52 @@ export class RemoteService {
     return result.kept.length ? closeText(sid.slice(0, 8), scope.host.host, result) : '';
   }
 
+  /**
+   * Хост сессии по `resumeId`: запомненный, если он ещё в списке хостов проектов, иначе опросом этих хостов (первый, где сессия есть).
+   * Негодная форма - null; сессии нет ни на одном хосте - отказ.
+   */
+  async locate(resumeId: unknown): Promise<{ sid: string; alias: string; host: Host } | null> {
+    if (typeof resumeId !== 'string' || !SESSION_ID.test(resumeId)) return null;
+    const aliases = this.deps.aliases();
+    const known = this.deps.hostOf(resumeId);
+    if (known !== undefined && aliases.includes(known)) return { sid: resumeId, alias: known, host: this.deps.host(known) };
+    const found = await Promise.all(
+      aliases.map(async (alias) => {
+        try {
+          return (await this.listOf(this.deps.host(alias))).some((s) => s.sid === resumeId) ? alias : undefined;
+        } catch {
+          return undefined;
+        }
+      }),
+    );
+    const alias = found.find((a): a is string => a !== undefined);
+    if (alias === undefined) throw new Error(`сессия ${resumeId.slice(0, 8)} не найдена на хостах проектов`);
+    this.deps.remember(resumeId, alias);
+    return { sid: resumeId, alias, host: this.deps.host(alias) };
+  }
+
   /** Завершение живой сессии по правилам close_agent: процесс останавливается, клоны без keep убираются. */
   async close(resumeId: unknown, keep: unknown): Promise<string> {
-    const id = parseResumeId(resumeId);
+    const id = await this.locate(resumeId);
     if (!id) throw new Error('Некорректный номер сессии');
-    const host = this.deps.host(id.host);
+    const host = id.host;
     await host.ensure();
     const result = hostCleanup(await host.request({ type: 'close', sid: id.sid, keep: keep === true }, CLOSE_LATE_MS));
     // В ai-cyborg закрытую сессию снимал с демона выход, доставленный владельцу канала. Канала нет, поэтому запись снимает этот attach:
     // иначе завершённая сессия оставалась бы у демона «живой» (и `purge` отказывал бы ей как работающей).
     await host.request({ type: 'attach', sid: id.sid, outFrom: Number.MAX_SAFE_INTEGER, evFrom: Number.MAX_SAFE_INTEGER }).catch(() => undefined);
-    return closeText(id.sid.slice(0, 8), id.host, result);
+    return closeText(id.sid.slice(0, 8), id.alias, result);
   }
 
   /** remote:fs. Файловая операция над клонами сессии (только чтение): границу клонов проверяет демон. */
   async fs(resumeId: unknown, op: unknown, target: unknown): Promise<unknown> {
-    const id = parseResumeId(resumeId);
-    const checked = id && validateRemoteFs(id.sid, op);
+    const checked = typeof resumeId === 'string' ? validateRemoteFs(resumeId, op) : null;
     const path = validateRemotePath(target);
-    if (!id || !checked) throw new Error('Некорректная файловая операция удалённой сессии');
+    if (!checked) throw new Error('Некорректная файловая операция удалённой сессии');
     if (path === null) throw new Error('Путь вне каталогов удалённой сессии');
-    const host = this.deps.host(id.host);
+    const id = await this.locate(resumeId);
+    if (!id) throw new Error('Некорректная файловая операция удалённой сессии');
+    const host = id.host;
     await host.ensure();
     const reply = await host.request({ type: 'fs', sid: id.sid, op: checked.op satisfies RemoteFsOp, path });
     if (typeof reply.error === 'string') throw new Error(reply.error);
@@ -353,11 +383,12 @@ export class RemoteService {
 
   /** remote:search. Поиск по содержимому или изменениям клона: корень - каталог клона на хосте. */
   async search(resumeId: unknown, mode: unknown, request: unknown): Promise<SearchReply> {
-    const id = parseResumeId(resumeId);
-    if (!id || (mode !== 'text' && mode !== 'changes') || typeof request !== 'object' || request === null) throw new Error('Некорректный поиск по удалённой сессии');
+    if (typeof resumeId !== 'string' || !SESSION_ID.test(resumeId) || (mode !== 'text' && mode !== 'changes') || typeof request !== 'object' || request === null) throw new Error('Некорректный поиск по удалённой сессии');
     const root = validateRemotePath((request as { root?: unknown }).root);
     if (root === null) throw new Error('Корень поиска вне каталогов удалённой сессии');
-    const host = this.deps.host(id.host);
+    const id = await this.locate(resumeId);
+    if (!id) throw new Error('Некорректный поиск по удалённой сессии');
+    const host = id.host;
     await host.ensure();
     const reply: Msg = await host.request({ type: 'search', sid: id.sid, mode, request }, SEARCH_TIMEOUT_MS);
     if (typeof reply.error === 'string') throw new Error(reply.error);

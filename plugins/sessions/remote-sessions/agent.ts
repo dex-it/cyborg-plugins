@@ -4,10 +4,8 @@
 import type { Agent, AgentEvent, HistoryEntry, LaunchRequest, LaunchSpec, Subscription } from '@cyborg-harness/contracts';
 import type { ProjectView } from './args.ts';
 import { STOP_QUIET_MS, translate, waitAfterStop, wholeLines, type HookEvent } from './events.ts';
-import type { Host } from './host.ts';
 import type { AgentdBundle } from './install.ts';
 import type { RemoteService } from './service.ts';
-import { parseResumeId, resumeIdOf } from './service.ts';
 import { SSH_PTY_PINNED, type Ssh } from './ssh.ts';
 
 /** Скрипт запуска без цели: закреплён правилом `launch` манифеста; печатает причину и выходит кодом 2. */
@@ -25,11 +23,8 @@ interface Tracked {
 export interface AgentDeps {
   ssh: Ssh;
   service: RemoteService;
-  host(alias: string): Host;
   bundle(): AgentdBundle;
   instance: string;
-  /** Хост из списка хостов какого-либо проекта: запуск на чужом алиасе отвергается. */
-  allowedHost(alias: string): Promise<boolean>;
   /** Проект, которому принадлежит каталог (по репозиториям); нет - undefined. */
   projectOf(cwd: string): Promise<ProjectView | undefined>;
   /** Версия ssh для `facts`: вывод `ssh -V` либо undefined, если ssh не найден. */
@@ -58,27 +53,27 @@ export function makeAgent(deps: AgentDeps): Agent {
     },
 
     async launch(request: LaunchRequest): Promise<LaunchSpec> {
-      const target = parseResumeId(request.resumeId);
+      // Хост сессии находит служба (запомненный или опросом хостов проектов): сессия на хосте вне списка проектов недостижима.
+      const target = await deps.service.locate(request.resumeId);
       if (!target) {
         // Без цели терминал печатает причину и выходит: вызов не падает, потому что запуск без resumeId допустим по контракту.
         return { program: '$SHELL', args: ['-lc', NO_TARGET_SCRIPT], cwd: request.cwd, env: {} };
       }
-      if (!(await deps.allowedHost(target.host))) throw new Error('хост не из списка хостов проектов');
-      const host = deps.host(target.host);
+      const host = target.host;
       await host.ensure();
       const list = await host.request({ type: 'list' });
       const item = (Array.isArray(list.sessions) ? (list.sessions as Record<string, unknown>[]) : []).find((s) => s.sid === target.sid);
-      if (!item) throw new Error(`сессия ${target.sid.slice(0, 8)} не найдена на ${target.host}`);
+      if (!item) throw new Error(`сессия ${target.sid.slice(0, 8)} не найдена на ${target.alias}`);
       let fromEnd = true;
       if (item.asleep === true) {
         // Спящую сначала будят: процесс claude --resume поднимает демон, терминал потом подключается к нему.
         await deps.service.wakeSession(host, target.sid, (item.dirs as string[] | undefined) ?? [], String(item.cwd));
         fromEnd = false;
       }
-      tracked.set(request.sessionId, { host: target.host, sid: target.sid, fromEnd });
+      tracked.set(request.sessionId, { host: target.alias, sid: target.sid, fromEnd });
       return {
         program: 'ssh',
-        args: [...SSH_PTY_PINNED, target.host, `sh .cyborg/agentd/${deps.bundle().version}/client.sh attach ${target.sid} ${deps.instance}`],
+        args: [...SSH_PTY_PINNED, target.alias, `sh .cyborg/agentd/${deps.bundle().version}/client.sh attach ${target.sid} ${deps.instance}`],
         cwd: request.cwd,
         env: await deps.env(),
       };
@@ -116,7 +111,7 @@ export function makeAgent(deps: AgentDeps): Agent {
             }
             // Любое событие хука, даже не дошедшее до контракта, значит «сессия не молчит».
             quiet.touch();
-            for (const event of translate(hook, cwd, (id) => resumeIdOf(id, t.host))) {
+            for (const event of translate(hook, cwd)) {
               if (event.type === 'cwd') cwd = event.cwd;
               quiet.listener(event);
             }
@@ -145,7 +140,7 @@ export function makeAgent(deps: AgentDeps): Agent {
     async history(cwd: string): Promise<HistoryEntry[]> {
       const project = await deps.projectOf(cwd);
       if (!project || project.hosts.length === 0) return [];
-      const found = await deps.service.historyOf(project);
+      const found = await deps.service.historyOf(project, true);
       return found.entries.map(({ id, cwd: dir, title, updated }) => ({ id, cwd: dir, title, updated }));
     },
   };

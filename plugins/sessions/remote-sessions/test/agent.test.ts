@@ -37,33 +37,48 @@ function fakeFile(): { ssh: Ssh; append(text: string): void; calls: string[]; fa
   return { ssh, append: (t) => void (content += t), calls, fail };
 }
 
-function agentWith(ssh: Ssh, extra: Partial<AgentDeps> = {}) {
-  const host = {
-    host: 'dev1',
-    ensure: () => Promise.resolve(),
-    request: async () => ({ type: 'list', sessions: [{ sid: SID, dirs: ['/r/a'], cwd: '/h/a' }] }),
-  } as unknown as Host;
+interface Opts extends Omit<Partial<AgentDeps>, 'service'> {
+  /** Хост, который служба отдаст по `locate`. */
+  host?: Host;
+  /** Что отвечает служба сверх `locate`. */
+  service?: Partial<Record<'wakeSession' | 'historyOf', unknown>>;
+}
+
+function agentWith(ssh: Ssh, { host: given, service: extra = {}, ...deps }: Opts = {}) {
+  const host =
+    given ??
+    ({
+      host: 'dev1',
+      ensure: () => Promise.resolve(),
+      request: async () => ({ type: 'list', sessions: [{ sid: SID, dirs: ['/r/a'], cwd: '/h/a' }] }),
+    } as unknown as Host);
+  const service = {
+    locate: async (id: unknown) => (id === SID ? { sid: SID, alias: 'dev1', host } : null),
+    wakeSession: () => Promise.resolve({}),
+    historyOf: () => Promise.resolve({ entries: [], unreachable: [] }),
+    ...extra,
+  } as unknown as RemoteService;
   return makeAgent({
     ssh,
-    service: { wakeSession: () => Promise.resolve(), historyOf: () => Promise.resolve({ entries: [], unreachable: [] }) } as unknown as RemoteService,
-    host: () => host,
+    service,
     bundle: () => ({ version: 'v1', files: [] }),
     instance: 'i-1',
-    allowedHost: async (h) => h === 'dev1',
     projectOf: async () => undefined,
     sshVersion: async () => 'OpenSSH_9.6p1, OpenSSL 3.0',
     env: async () => ({}),
     pollMs: 10,
-    ...extra,
+    ...deps,
   });
 }
+
+const sleepingHost = { host: 'dev1', ensure: () => Promise.resolve(), request: async () => ({ type: 'list', sessions: [{ sid: SID, asleep: true, dirs: ['/r/a'], cwd: '/h/a' }] }) } as unknown as Host;
 
 describe('watch: события хуков claude на хосте читаются опросом файла сессии', () => {
   it('новая (разбуженная) сессия читается с начала, подхваченная живая - с конца: прошлое уже показано', async () => {
     const f = fakeFile();
     f.append(line({ hook_event_name: 'SessionStart', session_id: 'c-1', cwd: '/h/a' }));
     const live = agentWith(f.ssh);
-    await live.launch({ sessionId: 'tab', cwd: '/l', resumeId: `${SID}@dev1` });
+    await live.launch({ sessionId: 'tab', cwd: '/l', resumeId: SID });
     const heard: AgentEvent[] = [];
     const sub = live.watch('tab', (e) => heard.push(e));
     await until('первый опрос', () => f.calls.some((c) => c.startsWith('tail')));
@@ -74,14 +89,10 @@ describe('watch: события хуков claude на хосте читаютс
     sub.dispose();
   });
 
-  it('перевод: смена cwd, session с resumeId <id>@хост, activity с инструментом, ожидание по белому списку; полуписаная строка ждёт перевода строки', async () => {
+  it('перевод: смена cwd, session с resumeId = идентификатору сессии, activity с инструментом, ожидание по белому списку; полуписаная строка ждёт перевода строки', async () => {
     const f = fakeFile();
-    const woken = agentWith(f.ssh, {
-      service: { wakeSession: () => Promise.resolve({}), historyOf: () => Promise.resolve({ entries: [], unreachable: [] }) } as unknown as RemoteService,
-      host: () =>
-        ({ host: 'dev1', ensure: () => Promise.resolve(), request: async () => ({ type: 'list', sessions: [{ sid: SID, asleep: true, dirs: ['/r/a'], cwd: '/h/a' }] }) }) as unknown as Host,
-    });
-    await woken.launch({ sessionId: 'tab', cwd: '/l', resumeId: `${SID}@dev1` });
+    const woken = agentWith(f.ssh, { host: sleepingHost });
+    await woken.launch({ sessionId: 'tab', cwd: '/l', resumeId: SID });
     f.append(line({ hook_event_name: 'SessionStart', session_id: 'c-1', cwd: '/h/a' }));
     f.append(line({ hook_event_name: 'PostToolUse', tool_name: 'Edit', cwd: '/h/a/.claude/worktrees/x' }));
     f.append('{"hook_event_name":"Notification","notification_type":"permission_prompt"');
@@ -90,7 +101,7 @@ describe('watch: события хуков claude на хосте читаютс
     await until('события', () => heard.length >= 4);
     assert.deepEqual(heard, [
       { type: 'cwd', cwd: '/h/a' },
-      { type: 'session', resumeId: 'c-1@dev1' },
+      { type: 'session', resumeId: 'c-1' },
       { type: 'cwd', cwd: '/h/a/.claude/worktrees/x' },
       { type: 'activity', tool: 'Edit' },
     ]);
@@ -102,8 +113,8 @@ describe('watch: события хуков claude на хосте читаютс
 
   it('сбой связи не роняет подписку: опрос продолжается, события не теряются и не повторяются', async () => {
     const f = fakeFile();
-    const a = agentWith(f.ssh, { host: () => ({ host: 'dev1', ensure: () => Promise.resolve(), request: async () => ({ type: 'list', sessions: [{ sid: SID, asleep: true, dirs: [], cwd: '/h' }] }) }) as unknown as Host });
-    await a.launch({ sessionId: 'tab', cwd: '/l', resumeId: `${SID}@dev1` });
+    const a = agentWith(f.ssh, { host: sleepingHost });
+    await a.launch({ sessionId: 'tab', cwd: '/l', resumeId: SID });
     const heard: AgentEvent[] = [];
     const sub = a.watch('tab', (e) => heard.push(e));
     f.append(line({ hook_event_name: 'UserPromptSubmit' }));
@@ -128,7 +139,7 @@ describe('watch: события хуков claude на хосте читаютс
     a.watch('нет-такой', () => assert.fail('событие'));
     await new Promise((r) => setTimeout(r, 40));
     assert.deepEqual(f.calls, []);
-    await a.launch({ sessionId: 'tab', cwd: '/l', resumeId: `${SID}@dev1` });
+    await a.launch({ sessionId: 'tab', cwd: '/l', resumeId: SID });
     assert.equal(await a.ended('tab', { code: 0 }), null);
     assert.equal(await a.ended('tab', { code: 255 }), null, 'обрыв ssh - не сбой агента: сессия на хосте жива, подхват - новый launch');
     assert.equal((await a.ended('tab', { code: 127 }))?.kind, 'notFound');
@@ -143,15 +154,23 @@ describe('launch спящей сессии', () => {
   it('сначала будит её службой (wake с её клонами), затем описывает терминал; живую не будит', async () => {
     const f = fakeFile();
     const woke: { sid: string; dirs: string[]; cwd: string }[] = [];
-    const service = { wakeSession: (_h: unknown, sid: string, dirs: string[], cwd: string) => (woke.push({ sid, dirs, cwd }), Promise.resolve({})), historyOf: () => Promise.resolve({ entries: [], unreachable: [] }) } as unknown as RemoteService;
+    const service = { wakeSession: (_h: unknown, sid: string, dirs: string[], cwd: string) => (woke.push({ sid, dirs, cwd }), Promise.resolve({})) };
     const sleeping = { host: 'dev1', ensure: () => Promise.resolve(), request: async () => ({ type: 'list', sessions: [{ sid: SID, asleep: true, dirs: ['/r/a', '/r/b'], cwd: '/h/a' }] }) } as unknown as Host;
-    const spec = await agentWith(f.ssh, { service, host: () => sleeping }).launch({ sessionId: 'tab', cwd: '/l', resumeId: `${SID}@dev1` });
+    const spec = await agentWith(f.ssh, { service, host: sleeping }).launch({ sessionId: 'tab', cwd: '/l', resumeId: SID });
     assert.deepEqual(woke, [{ sid: SID, dirs: ['/r/a', '/r/b'], cwd: '/h/a' }]);
     assert.equal(spec.program, 'ssh');
-    const live = [] as unknown[];
-    const liveService = { wakeSession: () => (live.push(1), Promise.resolve({})), historyOf: () => Promise.resolve({ entries: [], unreachable: [] }) } as unknown as RemoteService;
-    await agentWith(f.ssh, { service: liveService }).launch({ sessionId: 'tab2', cwd: '/l', resumeId: `${SID}@dev1` });
+    const live: unknown[] = [];
+    await agentWith(f.ssh, { service: { wakeSession: () => (live.push(1), Promise.resolve({})) } }).launch({ sessionId: 'tab2', cwd: '/l', resumeId: SID });
     assert.deepEqual(live, [], 'работающая сессия не будится');
+  });
+
+  it('хост сессии - тот, что назвала служба: терминал идёт на него, сессия без хоста (служба вернула null) - запуск без цели', async () => {
+    const f = fakeFile();
+    const spec = await agentWith(f.ssh).launch({ sessionId: 'tab', cwd: '/l', resumeId: SID });
+    assert.equal(spec.args.at(-2), 'dev1');
+    assert.match(spec.args.at(-1) ?? '', new RegExp(`client\\.sh attach ${SID} i-1$`));
+    const none = await agentWith(f.ssh).launch({ sessionId: 'tab', cwd: '/l', resumeId: 'не-сессия' });
+    assert.equal(none.program, '$SHELL');
   });
 });
 
@@ -182,10 +201,10 @@ describe('перевод хуков (копия agent-claude-code)', () => {
     assert.equal(waitingReason({ hook_event_name: 'Stop' }), 'Ход завершён, ждёт ответа');
     assert.equal(waitingReason({ hook_event_name: 'Stop', background_tasks: [{}] }), null);
     assert.equal(waitingReason({ hook_event_name: 'Notification', notification_type: 'idle_prompt' }), null);
-    const id = (s: string): string => `${s}@h`;
-    assert.deepEqual(translate({ hook_event_name: 'SessionStart', session_id: '--resume' }, undefined, id), []);
-    assert.deepEqual(translate({ hook_event_name: 'Stop', last_assistant_message: 'готово' }, undefined, id), [{ type: 'turnEnd', background: false, text: 'готово' }]);
-    assert.deepEqual(translate({ hook_event_name: 'PostToolUse', tool_name: 'Edit', agent_id: 'sub' }, undefined, id), []);
+    assert.deepEqual(translate({ hook_event_name: 'SessionStart', session_id: '--resume' }, undefined), []);
+    assert.deepEqual(translate({ hook_event_name: 'SessionStart', session_id: SID }, undefined), [{ type: 'session', resumeId: SID }]);
+    assert.deepEqual(translate({ hook_event_name: 'Stop', last_assistant_message: 'готово' }, undefined), [{ type: 'turnEnd', background: false, text: 'готово' }]);
+    assert.deepEqual(translate({ hook_event_name: 'PostToolUse', tool_name: 'Edit', agent_id: 'sub' }, undefined), []);
   });
 
   it('wholeLines: только полные строки и их размер в байтах (кириллица - два байта)', () => {

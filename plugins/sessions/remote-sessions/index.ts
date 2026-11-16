@@ -44,6 +44,7 @@ const SECTION: SettingsSection = {
   ],
 };
 
+const KNOWN_MAX = 200;
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 
 const plugin: PluginModule = {
@@ -71,9 +72,14 @@ const plugin: PluginModule = {
     // Экземпляр Cyborg: то же окно после обрыва забирает свои сессии у демона. Хранится в state, чтобы пережить перезапуск.
     const stored = state?.get().instance;
     let instance: string = typeof stored === 'string' && /^[0-9a-f-]{36}$/.test(stored) ? stored : '';
+    // Хосты сессий (`sid -> алиас`): по идентификатору сессии `launch` находит хост без опроса всех; хранится, сколько помещается в KNOWN_MAX последних.
+    const known = new Map<string, string>(
+      Object.entries(isRecord(state?.get().sessions) ? (state?.get().sessions as Record<string, unknown>) : {}).filter((e): e is [string, string] => typeof e[1] === 'string'),
+    );
+    const persist = (): Promise<unknown> | undefined => state?.set('workspace', { instance, sessions: Object.fromEntries(known) });
     if (!instance) {
       instance = crypto.randomUUID();
-      await state?.set('workspace', { instance });
+      await persist();
     }
 
     const env = async (): Promise<Record<string, string>> => {
@@ -110,6 +116,15 @@ const plugin: PluginModule = {
     };
     const service = new RemoteService({
       host: hostFor,
+      hostOf: (sid) => known.get(sid),
+      remember: (sid, host) => {
+        if (known.get(sid) === host) return;
+        known.delete(sid);
+        known.set(sid, host);
+        while (known.size > KNOWN_MAX) known.delete(known.keys().next().value as string);
+        void persist()?.catch(() => undefined);
+      },
+      aliases: allHosts,
       project: projectView,
       originUrl: async (dir) => {
         const res = await run('git', ['remote', 'get-url', 'origin'], { cwd: dir, timeoutMs: 20_000 }).catch(() => undefined);
@@ -126,10 +141,8 @@ const plugin: PluginModule = {
     const agent = makeAgent({
       ssh,
       service,
-      host: hostFor,
       bundle: () => bundle,
       instance,
-      allowedHost: (alias) => Promise.resolve(allHosts().includes(alias)),
       projectOf,
       sshVersion: async () => {
         const res = await run('ssh', ['-V'], { timeoutMs: 10_000 }).catch(() => undefined);
