@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { describe, it } from 'node:test';
@@ -11,21 +12,40 @@ const manifest = JSON.parse(await readFile(path.join(PLUGIN_DIR, 'manifest.json'
   provides: Record<string, string>;
   consumes: Record<string, string>;
   commands: Record<string, { args?: string[] }>;
-  permissions: { 'fs.read': string[]; pty: { program: string; deny: string[]; env: string[] }[] };
+  permissions: { 'fs.read': string[]; 'fs.write': string[]; shell: string[]; clipboard: string[]; pty: { program: string; deny: string[]; env: string[] }[] };
 };
 
 describe('плагин sessions', () => {
   it('проверка состава: манифест, файлы, правило импортов - без замечаний; права названы словами', async () => {
     const report = await checkPlugin(PLUGIN_DIR, { ignore: ['dist'], declarationPackages: ['@cyborg-plugins/contracts'] });
     assert.deepEqual(report.problems, []);
-    assert.equal(report.permissions.length, 2, report.permissions.join('; '));
+    assert.equal(report.permissions.length, 5, report.permissions.join('; '));
     assert.ok(report.permissions.some((p) => p.includes('запрещены флаги') && p.includes('--dangerously-skip-permissions')), report.permissions.join('; '));
+    for (const word of ['читает файлы', 'пишет файлы', 'открывает в системе', 'запускает в терминале', 'буфер обмена']) assert.ok(report.permissions.some((p) => p.startsWith(word)), word);
+  });
+
+  it('виды: «Сессии» (основная область) и «Сессии проекта» (боковая колонка), модули собираются в ui/*.js; таблица xterm лежит рядом и совпадает с пакетом', async () => {
+    const full = JSON.parse(await readFile(path.join(PLUGIN_DIR, 'manifest.json'), 'utf8')) as { ui: { views: Record<string, { module: string; area: string; title?: string }>; inlineStyles: boolean } };
+    assert.deepEqual(Object.keys(full.ui.views), ['main', 'history']);
+    assert.equal(full.ui.views.main?.area, 'main');
+    assert.equal(full.ui.views.history?.area, 'sidebar');
+    assert.equal(full.ui.views.history?.title, 'Сессии проекта');
+    assert.equal(full.ui.inlineStyles, true, 'xterm.js ставит встроенные стили');
+    for (const view of Object.values(full.ui.views)) assert.ok(existsSync(path.join(PLUGIN_DIR, view.module.replace(/\.js$/, '.ts'))), view.module);
+    // Вид грузит стили только со своего origin: таблица xterm - копия файла пакета (`npm ci` кладёт его в node_modules), версия записана в package.json плагина.
+    const installed = path.join(PLUGIN_DIR, '..', '..', '..', 'node_modules', '@xterm', 'xterm', 'css', 'xterm.css');
+    if (existsSync(installed)) assert.equal(await readFile(path.join(PLUGIN_DIR, 'ui', 'xterm.css'), 'utf8'), await readFile(installed, 'utf8'), 'ui/xterm.css разошёлся с @xterm/xterm: обновите копию');
+    const pkg = JSON.parse(await readFile(path.join(PLUGIN_DIR, 'package.json'), 'utf8')) as { dependencies: Record<string, string> };
+    assert.deepEqual(Object.keys(pkg.dependencies).toSorted(), ['@xterm/addon-fit', '@xterm/xterm']);
   });
 
   it('манифест: версия контракта, потребляемые контракты, закреплённый запуск и запрет всех шести опасных флагов', () => {
     assert.deepEqual(manifest.provides, { 'cyborg.sessions': '1.2' });
     assert.deepEqual(Object.keys(manifest.consumes).toSorted(), ['cyborg.agent', 'cyborg.agent-tool', 'cyborg.session-prompt']);
     assert.deepEqual(manifest.permissions['fs.read'], ['workspace'], 'рабочий каталог pty проверяется как чтение; сам плагин файлов не читает');
+    assert.deepEqual(manifest.permissions['fs.write'], ['workspace'], 'нужен проверке ядра команды агента history.delete (guard fs.write); сам плагин файлов не пишет');
+    assert.deepEqual(manifest.permissions.shell, ['any', 'http:', 'https:'], 'открыть путь и ссылку из вывода: исполняемое и чужие схемы ядро не пускает');
+    assert.deepEqual(manifest.permissions.clipboard, ['read', 'write']);
     const [rule] = manifest.permissions.pty;
     assert.ok(rule);
     assert.equal(rule.program, '$SHELL');
@@ -45,7 +65,7 @@ describe('плагин sessions', () => {
 
   it('каналы ai-cyborg -> команды плагина: соответствие сверено с манифестом', () => {
     for (const [channel, command] of Object.entries(CHANNELS)) assert.ok(command in manifest.commands, `${channel} -> ${command}`);
-    assert.deepEqual(Object.keys(CHANNELS).toSorted(), ['session:create', 'session:kill', 'session:resume']);
+    assert.deepEqual(Object.keys(CHANNELS).toSorted(), ['history:delete', 'history:list', 'session:create', 'session:kill', 'session:resume']);
   });
 
   it('на настоящем projects: сессия открывается в репозитории проекта, каталог вне проектов отвергается, рабочий каталог принят ядром как корень', async () => {

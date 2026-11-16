@@ -16,11 +16,28 @@
     "sessions.previous": {},
     "sessions.running": {},
     "sessions.reopen": { "args": ["string"] },
-    "sessions.restore": { "args": ["string"] }
+    "sessions.restore": { "args": ["string"] },
+    "sessions.tabs": {},
+    "sessions.close-tab": { "args": ["string"] },
+    "sessions.new-request": {},
+    "sessions.font-reset": {},
+    "sessions.open-path": { "args": ["string"] },
+    "sessions.open-url": { "args": ["string"] },
+    "sessions.copy": { "args": ["string"] },
+    "sessions.paste-text": {},
+    "sessions.history.list": { "args": ["string"] },
+    "sessions.history.delete": { "args": ["string", "string", "array", "string"] }
   },
+  "keybindings": [
+    { "key": "CmdOrCtrl+Shift+N", "command": "sessions.new-request" },
+    { "key": "CmdOrCtrl+0", "command": "sessions.font-reset" }
+  ],
   "documents": { "session": { "restorable": true, "area": "main", "order": 100 } },
   "permissions": {
     "fs.read": ["workspace"],
+    "fs.write": ["workspace"],
+    "shell": ["any", "http:", "https:"],
+    "clipboard": ["read", "write"],
     "pty": [
       {
         "program": "$SHELL",
@@ -34,5 +51,12 @@
         "env": ["SSH_AUTH_SOCK"]
       }
     ]
+  },
+  "ui": {
+    "views": {
+      "main": { "module": "./ui/main.js", "area": "main", "order": 100 },
+      "history": { "module": "./ui/history.js", "area": "sidebar", "order": 200, "title": "Сессии проекта" }
+    },
+    "inlineStyles": true
   }
 }
