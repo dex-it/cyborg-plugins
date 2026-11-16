@@ -113,7 +113,7 @@
     {"id": "FR-8004", "kind": "requirement", "feature": "08-session-history", "title": "Список прошлых сессий управляется с клавиатуры", "owner": "agent-claude-code", "task": "M-02", "status": "not-started"},
     {"id": "FR-8005", "kind": "requirement", "feature": "08-session-history", "title": "Удаление нескольких прошлых сессий разом", "owner": "agent-claude-code", "task": "M-02", "status": "not-started"},
     {"id": "FR-9002", "kind": "requirement", "feature": "09-session-isolation", "title": "Порядок аргументов запуска", "owner": "agent-claude-code", "task": "M-02", "status": "not-started"},
-    {"id": "FR-9001", "kind": "requirement", "feature": "09-session-isolation", "title": "Инструкция изоляции в каждой сессии", "owner": "session-isolation", "task": "M-06", "status": "not-started"},
+    {"id": "FR-9001", "kind": "requirement", "feature": "09-session-isolation", "title": "Инструкция изоляции в каждой сессии", "owner": "session-isolation", "task": "M-06", "status": "ported"},
     {"id": "FR-9003", "kind": "requirement", "feature": "09-session-isolation", "title": "Решает модель, Cyborg передаёт и следит", "owner": "sessions", "task": "M-03", "status": "not-started"},
     {"id": "FR-10001", "kind": "requirement", "feature": "10-ui-preferences", "title": "Размер шрифта окна", "owner": "core", "task": "-", "status": "not-started"},
     {"id": "FR-10002", "kind": "requirement", "feature": "10-ui-preferences", "title": "Фильтры и сортировка панелей переживают перезапуск", "owner": "core", "task": "-", "status": "not-started"},

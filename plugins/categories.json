@@ -15,7 +15,6 @@
     "planned": [
       { "id": "sessions", "summary": "Вкладки сессий в терминале ядра, делегирование дочерним сессиям, MCP-сервер сессий", "from": "ai-cyborg" },
       { "id": "remote-sessions", "summary": "Удалённые сессии Claude Code по SSH: хосты проекта, агент на хосте, клоны, обрыв и подхват, MCP-туннель, голосовой ввод", "from": "ai-cyborg" },
-      { "id": "session-isolation", "summary": "Параллельные сессии в одном репозитории уходят каждая в свой worktree", "from": "ai-cyborg" },
       { "id": "session-notifications", "summary": "Уведомление, когда сессия ждёт человека", "from": "ai-cyborg" },
       { "id": "next-actions", "summary": "Кнопки следующих шагов, которые предлагает модель", "from": "ai-cyborg" }
     ]
