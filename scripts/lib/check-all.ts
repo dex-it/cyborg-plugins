@@ -11,6 +11,7 @@ import path from 'node:path';
 import { LABELS_FILE, checkCategoryLabels, loadLabels } from './labels.ts';
 import { DESIGN_FILE, checkDesign, loadDesign } from './design.ts';
 import type { Design } from './design.ts';
+import { GENERATED_FILE, assetsStatus } from './embed-assets.ts';
 
 export interface CheckResult {
   catalog: Catalog;
@@ -30,6 +31,14 @@ export function checkRepo(root: string): CheckResult {
   // Модель контрактов проверяется, если репозиторий её ведёт (plugins/planned-contracts.json): временные репозитории тестов файла не имеют.
   const design = loadDesign(root, problems);
   if (existsSync(path.join(root, DESIGN_FILE))) notes.push(...checkDesign(catalog, bundles, design, problems).notes);
+  for (const plugin of catalog.plugins) {
+    const status = assetsStatus(plugin.dir);
+    const where = `${plugin.rel}/${GENERATED_FILE}`;
+    for (const message of status.problems) problems.push({ where: `${plugin.rel}/assets`, message });
+    if (status.state === 'missing') problems.push({ where, message: 'у плагина есть assets/, но нет модуля ресурсов: npm run embed-assets' });
+    if (status.state === 'stale') problems.push({ where, message: 'устарел относительно assets/: npm run embed-assets' });
+    if (status.state === 'orphan') problems.push({ where, message: 'есть, а каталога assets/ нет: удалите файл или верните ресурсы' });
+  }
   for (const b of bundles.bundles) {
     const ids = resolveBundle(b.id, bundles.bundles, problems);
     notes.push(...checkClosure(b.id, b.rel, ids, catalog, problems).notes.map((n) => `бандл ${b.id}: ${n}`));

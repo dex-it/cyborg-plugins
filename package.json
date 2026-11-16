@@ -15,6 +15,7 @@
     "bundle": "node scripts/bundle.ts",
     "new": "node scripts/new-plugin.ts",
     "contracts:gap": "node scripts/contracts.ts",
+    "embed-assets": "node scripts/embed-assets.ts",
     "sync-labels": "node scripts/sync-labels.ts",
     "docs:catalog": "node scripts/gen-catalog.ts",
     "check:docs-catalog": "node scripts/gen-catalog.ts --check"
