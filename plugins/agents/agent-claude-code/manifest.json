@@ -1,0 +1,29 @@
+{
+  "$schema": "../../../node_modules/@cyborg-harness/contracts/manifest.schema.json",
+  "id": "agent-claude-code",
+  "version": "1.0.0",
+  "engines": { "cyborg": "^1" },
+  "provides": { "cyborg.agent": "1.0" },
+  "commands": {
+    "agent-claude-code.history.list": { "args": ["string"], "callers": "plugins", "guard": { "fs.read": 0 } },
+    "agent-claude-code.history.delete": { "args": ["string", "array"], "callers": "plugins", "guard": { "fs.write": 0 } }
+  },
+  "permissions": {
+    "process": [
+      {
+        "program": "$SHELL",
+        "args": ["-lc", "claude --version"],
+        "deny": ["--dangerously-skip-permissions"]
+      }
+    ],
+    "fs.read": ["~/.claude/projects"],
+    "fs.write": ["~/.claude/projects"],
+    "launch": [
+      {
+        "program": "$SHELL",
+        "args": ["-lc", "exec claude --settings \"$CYBORG_SETTINGS\" \"$@\"", "cyborg"],
+        "env": ["CYBORG_EVENTS", "CYBORG_SETTINGS", "CYBORG_MCP_TOKEN"]
+      }
+    ]
+  }
+}
