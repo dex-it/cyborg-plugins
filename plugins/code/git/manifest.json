@@ -1,0 +1,97 @@
+{
+  "$schema": "../../../node_modules/@cyborg-harness/contracts/manifest.schema.json",
+  "id": "git",
+  "version": "1.0.0",
+  "engines": { "cyborg": "^1" },
+  "provides": {
+    "cyborg.git": {
+      "version": "1.1",
+      "guard": {
+        "root": { "fs.read": 0 },
+        "branch": { "fs.read": 0 },
+        "status": { "fs.read": 0 },
+        "headContent": { "fs.read": 0 },
+        "branches": { "fs.read": 0 },
+        "switch": { "fs.read": 0 },
+        "remotes": { "fs.read": 0 },
+        "files": { "fs.read": 0 },
+        "onChange": { "fs.read": 0 }
+      }
+    },
+    "cyborg.tree-decoration": {
+      "version": "1.0",
+      "guard": {
+        "marks": { "fs.read": 0 }
+      }
+    }
+  },
+  "optional": { "cyborg.projects": "^1", "cyborg.sessions": "^1" },
+  "permissions": {
+    "fs.read": ["workspace"],
+    "process": [
+      {
+        "program": "git",
+        "args": ["--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", "status", "--porcelain=v1", "-z", "--branch", "--untracked-files=all"],
+        "env": ["GIT_CONFIG_COUNT", "GIT_CONFIG_KEY_*", "GIT_CONFIG_VALUE_*"],
+        "deny": ["-c", "-C", "--config-env", "--output", "--git-dir", "--work-tree", "--exec-path", "--ext-diff", "--textconv"]
+      },
+      {
+        "program": "git",
+        "args": ["--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", "config", "--show-scope", "--null", "--name-only", "--get-regexp", "^filter\\..+\\.(clean|process|required)$"],
+        "env": ["LC_ALL"],
+        "deny": ["-c", "-C", "--config-env", "--output", "--git-dir", "--work-tree", "--exec-path", "--ext-diff", "--textconv"]
+      },
+      {
+        "program": "git",
+        "args": ["--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", "ls-files", "--stage", "-z"],
+        "deny": ["-c", "-C", "--config-env", "--output", "--git-dir", "--work-tree", "--exec-path", "--ext-diff", "--textconv"]
+      },
+      {
+        "program": "git",
+        "args": ["--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+        "deny": ["-c", "-C", "--config-env", "--output", "--git-dir", "--work-tree", "--exec-path", "--ext-diff", "--textconv"]
+      },
+      {
+        "program": "git",
+        "args": ["--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", "rev-parse", "--show-toplevel"],
+        "deny": ["-c", "-C", "--config-env", "--output", "--git-dir", "--work-tree", "--exec-path", "--ext-diff", "--textconv"]
+      },
+      {
+        "program": "git",
+        "args": ["--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", "rev-parse", "--abbrev-ref", "HEAD"],
+        "deny": ["-c", "-C", "--config-env", "--output", "--git-dir", "--work-tree", "--exec-path", "--ext-diff", "--textconv"]
+      },
+      {
+        "program": "git",
+        "args": ["--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", "cat-file", "-s"],
+        "deny": ["-c", "-C", "--config-env", "--output", "--git-dir", "--work-tree", "--exec-path", "--ext-diff", "--textconv", "--filters", "--batch", "--batch-check", "--batch-command"]
+      },
+      {
+        "program": "git",
+        "args": ["--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", "cat-file", "blob"],
+        "deny": ["-c", "-C", "--config-env", "--output", "--git-dir", "--work-tree", "--exec-path", "--ext-diff", "--textconv", "--filters", "--batch", "--batch-check", "--batch-command"]
+      },
+      {
+        "program": "git",
+        "args": ["--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", "remote", "-v"],
+        "deny": ["-c", "-C", "--config-env", "--output", "--git-dir", "--work-tree", "--exec-path", "--ext-diff", "--textconv"]
+      },
+      {
+        "program": "git",
+        "args": ["--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", "for-each-ref", "--sort=-committerdate", "--format=%(refname)", "refs/heads", "refs/remotes"],
+        "deny": ["-c", "-C", "--config-env", "--output", "--git-dir", "--work-tree", "--exec-path", "--ext-diff", "--textconv"]
+      },
+      {
+        "program": "git",
+        "args": ["--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", "config", "--show-scope", "--null", "--name-only", "--get-regexp", "^(filter\\.|extensions\\.partialclone$|remote\\..*\\.promisor$)"],
+        "env": ["LC_ALL"],
+        "deny": ["-c", "-C", "--config-env", "--output", "--git-dir", "--work-tree", "--exec-path", "--ext-diff", "--textconv"]
+      },
+      {
+        "program": "git",
+        "args": ["--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", "-c", "submodule.recurse=false", "switch", "--"],
+        "deny": ["-c", "-C", "--config-env", "--output", "--git-dir", "--work-tree", "--exec-path", "--ext-diff", "--textconv", "--force", "-f", "--discard-changes", "--orphan", "--detach", "-d", "--merge", "-m", "--recurse-submodules", "--force-create"]
+      }
+    ]
+  }
+}

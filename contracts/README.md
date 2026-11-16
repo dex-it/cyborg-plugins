@@ -1,6 +1,6 @@
 # @cyborg-plugins/contracts
 
-Типы контрактов `cyborg.projects`, `cyborg.project-settings` и `cyborg.editor` и расширение `cyborg.sessions` 1.2 (`SessionsV12`). Только типы: `declare module '@cyborg-harness/contracts'` дополняет карту `Contracts`, кода в пакете нет.
+Типы контрактов `cyborg.projects`, `cyborg.project-settings` и `cyborg.editor` и расширения `cyborg.sessions` 1.2 (`SessionsV12`) и `cyborg.git` 1.1 (`GitV11`). Только типы: `declare module '@cyborg-harness/contracts'` дополняет карту `Contracts`, кода в пакете нет.
 
 ## Типы временные
 
@@ -24,6 +24,7 @@ import type { ProjectInfo } from '@cyborg-plugins/contracts';
 | `cyborg.project-settings` 1 | many | `projects` | `trackers`, `remote-sessions` и другие | `section`, `load`, `validate`, `save`, `onChange` |
 | `cyborg.editor` 1 | one | `viewer` | `viewer` | `open`, `openWithValidation` |
 | `cyborg.sessions` 1.2 | one | `sessions` | `sessions` | `onChange`, `reveal` (типы ядра) и `create`, `send`, `paste`, `labels`, `setLabels`, `find`, `uses` (`SessionsV12`) |
+| `cyborg.git` 1.1 | one | `git` | `git` | `status`, `onChange` (типы ядра) и `root`, `branch`, `headContent`, `branches`, `switch`, `remotes`, `files` (`GitV11`) |
 
 Отличия от проектной модели `plugins/planned-contracts.json` и от каталога контрактов ядра:
 
@@ -46,3 +47,20 @@ if (typeof sessions?.uses === 'function') await sessions.uses(root);
 - `send` пишет в сессию как с клавиатуры, `paste` вставляет текст в строку ввода (bracketed paste), `submit` отправляет Enter отдельной записью.
 - `uses(root)`: живая сессия запущена с этим каталогом (рабочим или из `--add-dir`); текущий каталог после перехода в worktree не считается.
 - `create` проверяет каталоги по репозиториям проектов (`cyborg.projects`) и возвращает `{ sessionId, title }`.
+
+### cyborg.git 1.1
+
+В ядре есть `Git` только с `status` и `onChange` (1.0, черновик PL-04); остальные семь членов каталога ([cyborg-harness#258](https://github.com/dex-it/cyborg-harness/issues/258)) объявляет здесь интерфейс `GitV11 extends Git`: карта `Contracts` ядра не меняется (запись `cyborg.git` там уже есть), поставщик `git` отдаёт контракт версии `1.1`, а потребитель берёт его как `Remote<GitV11>` и проверяет, что нужный член есть:
+
+```ts
+const git = ctx.contracts.get('cyborg.git', 1) as Remote<GitV11> | undefined;
+if (typeof git?.headContent === 'function') await git.headContent(file);
+```
+
+Потребитель с `requires: { "cyborg.git": "^1.1" }` активируется только при поставщике 1.1.
+
+- `root`, `branch`, `headContent`, `remotes`, `files`: читающие запросы `src/main/git.ts` ai-cyborg; ошибка git даёт пустой ответ (`null`, пустой список), как там.
+- `branches(root)` и `switch(root, branch)`: только репозитории проектов (`cyborg.projects`); `switch` отказывает `{ error }` при работающей сессии (`cyborg.sessions.uses`), при `filter.*`, partial clone и отказе самого git. Имя ветки берётся только из списка веток.
+- Все члены с путём объявлены с `guard` `fs.read` на первый аргумент.
+- Результат смены - `GitSwitchResult` (`{}` или `{ error }`), а не исключение: так отдавал канал `git:switch` в ai-cyborg.
+- `status` отвечает `null` вне репозитория (в ai-cyborg пустой объект) и отказом, если защита от фильтров репозитория не смогла собрать их ключи.
