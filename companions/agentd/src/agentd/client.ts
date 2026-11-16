@@ -141,7 +141,14 @@ function listenTunnel(t: Tunnel): net.Server {
     client.on('close', () => up.destroy());
     up.on('close', () => client.destroy());
   });
-  server.listen(t.fwd, () => fs.chmodSync(t.fwd, 0o600));
+  // Сокет создаётся сразу с правами 0600: umask сужается на время bind (он выполняется синхронно в listen), иначе между созданием и chmod
+  // сокет доступен по umask процесса (0755 на Linux) - окно гонки, в котором его видит и тест, и чужой процесс на хосте.
+  const previousUmask = process.umask(0o177);
+  try {
+    server.listen(t.fwd, () => fs.chmodSync(t.fwd, 0o600));
+  } finally {
+    process.umask(previousUmask);
+  }
   const quit = (): void => {
     server.close();
     fs.rmSync(t.fwd, { force: true });
