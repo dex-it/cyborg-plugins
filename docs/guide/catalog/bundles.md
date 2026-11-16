@@ -20,7 +20,7 @@ sidebar:
 Минимальное рабочее место: сессии Claude Code во вкладках с уведомлениями и изоляцией.
 
 - Идентификатор: `agent-sessions`
-- Плагины (4): `agent-claude-code`, `sessions`, `session-isolation`, `session-notifications`
+- Плагины (5): `projects`, `agent-claude-code`, `sessions`, `session-isolation`, `session-notifications`
 
 ### Работа с кодом
 
