@@ -19,7 +19,7 @@ Cyborg Plugins - репозиторий плагинов для приложен
 - Метки GitHub - файл `.github/labels.json`, применяет `npm run sync-labels [-- --dry-run|--prune]` (система как в cyborg-harness: type, level, component, category, stage, priority, status, platform, effort)
 - Новый плагин - `npm run new -- <категория> <id> ["Название"]`
 - Сайт - `cd site && npm ci && npm run build && npm run verify`
-- CI - `.github/workflows/ci.yml` (macOS и Linux), `docs-site.yml` (сайт), `release.yml` (бандлы по тегу `v*`)
+- CI - `.github/workflows/ci.yml` (macOS и Linux; включает сквозной тест `scripts/test/pipeline.test.ts`), `docs-site.yml` (сайт), `release.yml` (бандлы по тегу `v*`), `drift.yml` (раз в неделю: ai-cyborg master против матрицы паритета)
 
 ## Карта
 

@@ -66,7 +66,14 @@ jobs:
         run: npm run parity -- .ai-cyborg
       - run: npm run check:plugins
       - run: npm run typecheck
-      - run: npm test
+      # Пробелы контрактов относительно типов ядра: сведения в журнале, не отказ (npm run contracts:gap -- --strict сделает их отказом).
+      - name: пробелы контрактов (сведения)
+        run: npm run contracts:gap
+      # Включает сквозной тест (scripts/test/pipeline.test.ts): плагины -> бандл -> поставка -> настоящее ядро на процессах-хостах.
+      # Зависший тест падает под своим именем по --test-timeout в `npm test`; выше предела обрывается шаг, а не вся задача.
+      - name: npm test
+        timeout-minutes: 8
+        run: npm test
       # Страницы каталога сайта строятся из карточек и манифестов: правка без `npm run docs:catalog` красит шаг.
       - name: страницы каталога (свежесть)
         run: npm run check:docs-catalog
