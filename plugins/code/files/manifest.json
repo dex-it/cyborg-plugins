@@ -1,0 +1,27 @@
+{
+  "$schema": "../../../node_modules/@cyborg-harness/contracts/manifest.schema.json",
+  "id": "files",
+  "version": "1.0.0",
+  "engines": { "cyborg": "^1" },
+  "consumes": { "cyborg.tree-decoration": "^1" },
+  "optional": { "cyborg.projects": "^1", "cyborg.sessions": "^1", "cyborg.git": "^1" },
+  "commands": {
+    "files.view": { "args": ["string?", "boolean?"] },
+    "files.list": { "args": ["string"] },
+    "files.expand": { "args": ["string"] },
+    "files.collapse": { "args": ["string"] },
+    "files.toggle-root": { "args": ["string"] },
+    "files.open": { "args": ["string"] },
+    "files.branches": { "args": ["string"] },
+    "files.switch": { "args": ["string", "string"] },
+    "files.stats": {}
+  },
+  "permissions": {
+    "fs.read": ["workspace"]
+  },
+  "ui": {
+    "views": {
+      "tree": { "module": "./ui/tree.js", "area": "sidebar", "order": 300, "title": "Дерево" }
+    }
+  }
+}

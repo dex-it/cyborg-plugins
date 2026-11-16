@@ -1,0 +1,173 @@
+/* Вид «Дерево»: на токенах темы окна (--cy-*), цвета не заданы руками. */
+
+#bar {
+  display: flex;
+  align-items: center;
+  gap: var(--cy-gap);
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--cy-border);
+}
+
+#scopes {
+  flex: 1;
+  min-width: 0;
+}
+
+#hint,
+#error {
+  margin: 6px;
+  color: var(--cy-muted);
+}
+
+#error {
+  color: var(--cy-danger);
+}
+
+#tree {
+  overflow: auto;
+  font-size: var(--cy-font-size);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.row:hover {
+  background: var(--cy-surface);
+}
+
+.row:focus-visible {
+  outline: 1px solid var(--cy-accent);
+  outline-offset: -1px;
+}
+
+.row.selected {
+  background: var(--cy-surface);
+  outline: 1px solid var(--cy-border);
+}
+
+.row.root {
+  font-weight: 600;
+  border-top: 1px solid var(--cy-border);
+}
+
+.row.root.primary {
+  border-top: 0;
+}
+
+.row.other,
+.row.link {
+  color: var(--cy-muted);
+  cursor: default;
+}
+
+.twisty {
+  display: inline-block;
+  width: 1em;
+  color: var(--cy-muted);
+}
+
+.name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.meta {
+  margin-left: auto;
+  padding-left: 8px;
+  color: var(--cy-muted);
+  font-weight: 400;
+}
+
+.meta .problem,
+.meta .notice {
+  color: var(--cy-danger);
+}
+
+button.branch {
+  border: 1px solid var(--cy-border);
+  border-radius: var(--cy-radius);
+  background: var(--cy-surface);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.badge {
+  margin-left: auto;
+  font-family: var(--cy-font-mono);
+  font-size: 0.85em;
+}
+
+.st-modified,
+.st-changed,
+.st-renamed {
+  color: var(--cy-accent);
+}
+
+.st-added,
+.st-untracked {
+  color: var(--cy-fg);
+}
+
+.st-deleted,
+.st-conflict {
+  color: var(--cy-danger);
+}
+
+.st-deleted.name {
+  text-decoration: line-through;
+}
+
+#branch-menu {
+  position: sticky;
+  bottom: 0;
+  max-height: 50%;
+  overflow: auto;
+  border-top: 1px solid var(--cy-border);
+  background: var(--cy-bg);
+}
+
+.menu-title,
+.menu-error {
+  padding: 4px 8px;
+  color: var(--cy-muted);
+}
+
+.menu-error {
+  color: var(--cy-danger);
+}
+
+.menu-filter {
+  box-sizing: border-box;
+  width: calc(100% - 16px);
+  margin: 4px 8px;
+}
+
+.menu-item {
+  display: flex;
+  gap: 8px;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+
+.menu-item:hover,
+.menu-item:focus-visible {
+  background: var(--cy-surface);
+  outline: 0;
+}
+
+.menu-item.current {
+  font-weight: 600;
+}
+
+.repo-path {
+  margin-left: auto;
+  color: var(--cy-muted);
+}
