@@ -121,7 +121,6 @@ npm test                 # тесты скриптов и плагинов
 ```bash
 npm run new -- code my-plugin "Мой плагин"
 npm run check && npm run check:plugins && npm run typecheck && npm test
-npm run docs:catalog
 ```
 
 `npm run new` копирует шаблон в `plugins/code/my-plugin/`: манифест, главная часть, контракт, вид, тест на тест-ките ядра и карточка `README.md`. Он сразу проходит все проверки, поэтому от него удобно отталкиваться. Дальше - pull request в `master`; подробно в [руководстве автору](docs/guide/authors/index.md).
@@ -178,7 +177,7 @@ npm run typecheck          # типы скриптов и плагинов
 npm test                   # тесты скриптов и плагинов
 npm run bundle -- --all    # собрать все бандлы (dist/bundles)
 npm run new -- <категория> <id>   # новый плагин из шаблона
-npm run docs:catalog       # страницы каталога для сайта
+npm run docs:catalog       # построить страницы каталога для сайта (сборка сайта делает это сама)
 npm run sync-labels        # метки GitHub по .github/labels.json
 ```
 

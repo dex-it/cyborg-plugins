@@ -74,9 +74,6 @@ jobs:
       - name: npm test
         timeout-minutes: 8
         run: npm test
-      # Страницы каталога сайта строятся из карточек и манифестов: правка без `npm run docs:catalog` красит шаг.
-      - name: страницы каталога (свежесть)
-        run: npm run check:docs-catalog
       # Бандлы собираются целиком настоящим cyborg-plugin: поставка, bundle.json, config.json и архивы.
       - name: бандлы (сборка и упаковка)
         run: npm run bundle -- --all --pack

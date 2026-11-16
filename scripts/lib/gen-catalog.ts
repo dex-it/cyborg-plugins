@@ -1,5 +1,5 @@
 // Страницы каталога для сайта: docs/guide/catalog/. Их никто не пишет руками: источник - карточки README.md плагинов,
-// манифесты, plugins/categories.json и bundles/*.json. Свежесть сверяет `npm run check:docs-catalog` (и CI).
+// манифесты, plugins/categories.json и bundles/*.json. Страницы в git не лежат: их строит сборка сайта (`npm run build` в site/), локально - `npm run docs:catalog`.
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';

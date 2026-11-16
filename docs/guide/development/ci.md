@@ -21,8 +21,7 @@ flowchart LR
   A["Репозиторий<br/>и клон ядра"] --> B["Сборка пакетов<br/>ядра"]
   B --> C["npm ci<br/>harness:link"]
   C --> D["check, check:plugins<br/>typecheck, test"]
-  D --> E["check:docs-catalog"]
-  E --> F["bundle --all --pack"]
+  D --> F["bundle --all --pack"]
 ```
 
 Пока пакеты ядра не опубликованы, CI забирает [cyborg-harness](https://github.com/dex-it/cyborg-harness) в `.harness/` на ссылке из переменной репозитория `HARNESS_REF` (по умолчанию `master`), ставит его зависимости без скриптов и собирает пакеты (`npm run build:packages`). Затем `npm run harness:link .harness` кладёт ссылки в `node_modules`. После выпуска пакетов эти шаги заменит обычный `npm ci`.

@@ -21,7 +21,6 @@ description: "Короткий путь от идеи до pull request: кат�
 
    ```bash
    npm run check && npm run check:plugins && npm run typecheck && npm test
-   npm run docs:catalog          # страница плагина попадёт в каталог сайта
    ```
 
 6. **Откройте pull request** в `master`. CI повторит то же на двух системах.
@@ -32,4 +31,4 @@ description: "Короткий путь от идеи до pull request: кат�
 
 - Править `manifest.json` под каталог: категории в нём нет, она определяется путём.
 - Копировать плагин в несколько категорий: идентификатор один на весь репозиторий.
-- Править страницы `docs/guide/catalog/` руками: их строит `npm run docs:catalog`.
+- Править или коммитить страницы `docs/guide/catalog/`: их строит сборка сайта.

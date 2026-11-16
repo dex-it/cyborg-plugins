@@ -45,7 +45,6 @@ npm run check             # раскладка, карточка, бандлы
 npm run check:plugins     # cyborg-plugin check: импорты, права, версия API
 npm run typecheck
 npm test
-npm run docs:catalog      # страница плагина для сайта
 ```
 
 Если плагин был в `planned` своей категории (`plugins/categories.json`), удалите запись оттуда: проверка не даст оставить плагин и в каталоге, и в планах.
