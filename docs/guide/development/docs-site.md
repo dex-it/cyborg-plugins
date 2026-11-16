@@ -10,7 +10,7 @@ description: "Как собирается и публикуется этот с�
 | Путь | Что |
 |---|---|
 | `docs/guide/` | Страницы в Markdown: `start/`, `bundles/`, `authors/`, `development/`, `faq.md`, главная |
-| `docs/guide/catalog/` | Страницы каталога; **генерируются** (`npm run docs:catalog`) |
+| `docs/guide/catalog/` | Страницы каталога; **генерируются при сборке** (`npm run docs:catalog`), в git не лежат |
 | `site/astro.config.mjs` | Настройка Astro и Starlight, боковое меню (`sidebar`) |
 | `site/site.config.mjs` | Адрес и бренд: `OWNER`, `REPO_NAME` и производные |
 | `site/src/content.config.ts` | Берёт страницы из `docs/guide/`, а не из `site/src` |
@@ -21,7 +21,6 @@ description: "Как собирается и публикуется этот с�
 ## Локально
 
 ```bash
-npm run docs:catalog     # в корне: страницы каталога
 cd site
 npm ci
 npm run dev              # сервер разработки
@@ -43,7 +42,7 @@ npm run check            # типы страниц и конфига
 
 ## Страницы каталога
 
-`docs/guide/catalog/` строит `scripts/gen-catalog.ts` из карточек `README.md`, манифестов, `plugins/categories.json` и `bundles/`. Руками их не правят: правка исчезнет при следующей генерации, а CI сверкой (`npm run check:docs-catalog`) не пропустит устаревшие страницы.
+`docs/guide/catalog/` строит `scripts/gen-catalog.ts` из карточек `README.md`, манифестов, `plugins/categories.json` и `bundles/`. Руками их не правят и не коммитят (`docs/guide/catalog/` в `.gitignore`): сборка сайта (`npm run build`, `dev`, `check` в `site/`) строит их заново, поэтому правка карточки, бандла, модели контрактов или матрицы паритета видна на сайте без отдельного коммита и параллельные pull request не конфликтуют по этим файлам.
 
 ## Проверка сборки
 

@@ -35,5 +35,5 @@ npm run check && npm run check:plugins && npm run typecheck && npm test
 
 1. Ветка от `master` с коротким именем по сути.
 2. Изменение вместе с тестом и правкой документации: страницы лежат в `docs/guide/`.
-3. `npm run check && npm run check:plugins && npm run typecheck && npm test`; если менялись плагины или бандлы - `npm run docs:catalog`; если менялись метки - `npm run sync-labels`.
+3. `npm run check && npm run check:plugins && npm run typecheck && npm test`; если менялись метки - `npm run sync-labels`.
 4. Pull request в `master`; слияние после зелёного CI.

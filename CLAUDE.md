@@ -11,7 +11,7 @@ Cyborg Plugins - репозиторий плагинов для приложен
 - Сборка плагинов - `npm run build` (в `dist/plugins/<id>`)
 - Типы - `npm run typecheck` (скрипты и каждый плагин; TS 6)
 - Тесты - `npm test` (node --test скриптов и фикстур, затем тесты каждого плагина); после `npm install` снова `npm run harness:link` (он предупредит, если ядро собрано давно); без `harness:link` один тест сборки бандла пропускается
-- Страницы каталога сайта - `npm run docs:catalog`, сверка `npm run check:docs-catalog`
+- Страницы каталога сайта - `npm run docs:catalog`; в git они **не лежат** (`docs/guide/catalog/` в .gitignore), их строит сборка сайта; правка карточки, бандла, модели или матрицы страницы коммитить не требует
 - Бандлы - `npm run bundle -- <id>|--all [--pack] [--out <каталог>]`
 - Матрица паритета с ai-cyborg - `parity/matrix.json` (338 строк: требования, каналы, события, ключи, диалоги, файлы данных; владелец, задача, статус); `npm run parity [-- <клон ai-cyborg> [--write-missing]]`; CI сверяет с кодом ai-cyborg на якорном коммите; строка с владельцем `?` и статус allowlist без причины - ошибка `npm run check`
 - Ресурсы плагина (assets/ -> assets.generated.ts) - `npm run embed-assets -- <каталог>|--all [--check]`; исходные расширения в assets/ запрещены (только `.txt`), свежесть модуля проверяет `npm run check`
@@ -47,5 +47,5 @@ Cyborg Plugins - репозиторий плагинов для приложен
 ## Запреты
 
 - `node_modules/`, `dist/`, `package-lock.json`, `site/package-lock.json` руками не править
-- `docs/guide/catalog/` руками не править: `npm run docs:catalog`
+- `docs/guide/catalog/` руками не править и не коммитить: его строит `npm run docs:catalog`
 - Не копировать код ядра и не править контракты `cyborg.*` здесь: это `@cyborg-harness/contracts`

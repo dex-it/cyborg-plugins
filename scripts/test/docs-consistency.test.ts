@@ -7,6 +7,7 @@ import path from 'node:path';
 import { describe, it } from 'node:test';
 import { checkRepo } from '../lib/check-all.ts';
 import { loadMatrix } from '../lib/parity.ts';
+import { generatePages } from '../lib/gen-catalog.ts';
 import { REPO_ROOT } from '../lib/util.ts';
 
 const read = (rel: string): string => readFileSync(path.join(REPO_ROOT, rel), 'utf8');
@@ -59,13 +60,15 @@ describe('документы и данные согласованы', () => {
   });
 
   it('ссылки на страницы сайта внутри docs/guide указывают на существующие страницы', () => {
-    const slugs = new Set<string>();
+    // Страницы каталога в git не лежат: их слаги берутся из того, что построит сборка сайта.
+    const slugs = new Set<string>([...generatePages(REPO_ROOT).keys()].map((k) => ['catalog', k.replace(/\.md$/, '').replace(/(^|\/)index$/, '')].filter(Boolean).join('/')));
     for (const file of pages(GUIDE)) {
       const rel = path.relative(GUIDE, file).split(path.sep).join('/').replace(/\.mdx?$/, '').replace(/\/index$/, '').toLowerCase();
       slugs.add(rel === 'index' ? '' : rel);
     }
     const broken: string[] = [];
     for (const file of pages(GUIDE)) {
+      if (file.includes(`${path.sep}catalog${path.sep}`)) continue;
       for (const m of readFileSync(file, 'utf8').matchAll(/\]\((\/[a-z0-9\-/]*)(?:#[^)]*)?\)/g)) {
         const target = (m[1] ?? '').replace(/^\/|\/$/g, '');
         if (!slugs.has(target)) broken.push(`${path.relative(GUIDE, file)} -> ${m[1] ?? ''}`);

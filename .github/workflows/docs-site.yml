@@ -9,13 +9,18 @@ name: Docs site
 #
 # Проверка НЕ должна быть required: у pull_request ниже фильтр путей, а required-проверка,
 # которая не запустилась, вешает PR в BLOCKED. Required - ci.yml.
-# Страницы каталога (docs/guide/catalog) сгенерированы и лежат в git; их свежесть сверяет ci.yml.
+# Страницы каталога (docs/guide/catalog) в git не лежат: их строит сборка сайта (`npm run build` в site/ вызывает scripts/gen-catalog.ts),
+# поэтому правка карточки плагина, бандла или матрицы паритета запускает этот workflow.
 on:
   pull_request:
     paths:
       - 'docs/guide/**'
       - 'site/**'
       - 'assets/**'
+      - 'plugins/**'
+      - 'bundles/**'
+      - 'parity/**'
+      - 'scripts/**'
       - '.github/workflows/docs-site.yml'
   push:
     branches:

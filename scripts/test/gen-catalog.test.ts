@@ -60,8 +60,10 @@ describe('страницы каталога', () => {
     assert.deepEqual(diffPages(repo.root, pages).sort(), ['лишняя страница code/лишняя.md', 'страница index.md устарела']);
   });
 
-  it('страницы, закоммиченные в самом репозитории, свежие', () => {
-    assert.deepEqual(diffPages(REPO_ROOT, generatePages(REPO_ROOT)), []);
-    assert.match(readFileSync(path.join(REPO_ROOT, CATALOG_DIR, 'index.md'), 'utf8'), /Страница сгенерирована/);
+  it('каталог в git не лежит: docs/guide/catalog в .gitignore, а страницы строятся в памяти из источников репозитория', () => {
+    assert.match(readFileSync(path.join(REPO_ROOT, '.gitignore'), 'utf8'), /^docs\/guide\/catalog\/$/m);
+    const pages = generatePages(REPO_ROOT);
+    assert.ok(pages.has('index.md') && pages.has('bundles.md') && pages.has('contracts.md') && pages.has('parity.md'));
+    for (const content of pages.values()) assert.match(content, /Страница сгенерирована/);
   });
 });

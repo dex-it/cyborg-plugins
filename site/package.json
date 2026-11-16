@@ -9,12 +9,13 @@
   },
   "scripts": {
     "brand": "node scripts/copy-brand.mjs",
-    "dev": "npm run brand && astro dev",
-    "build": "npm run brand && astro build",
+    "dev": "npm run brand && npm run catalog && astro dev",
+    "build": "npm run brand && npm run catalog && astro build",
     "verify": "node scripts/check-dist.mjs",
     "preview": "astro preview",
-    "check": "npm run brand && astro check",
-    "astro": "astro"
+    "check": "npm run brand && npm run catalog && astro check",
+    "astro": "astro",
+    "catalog": "node ../scripts/gen-catalog.ts"
   },
   "dependencies": {
     "@astrojs/markdown-satteri": "0.4.9",
