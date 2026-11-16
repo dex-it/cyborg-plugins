@@ -1,17 +1,5 @@
 [
   {
-    "id": "agent-sessions",
-    "title": "Сессии агента",
-    "summary": "Минимальное рабочее место: сессии Claude Code во вкладках с уведомлениями и изоляцией.",
-    "plugins": [
-      "projects",
-      "agent-claude-code",
-      "sessions",
-      "session-isolation",
-      "session-notifications"
-    ]
-  },
-  {
     "id": "code-workspace",
     "title": "Работа с кодом",
     "summary": "Проекты, дерево файлов, просмотр, git и поиск рядом с сессией.",

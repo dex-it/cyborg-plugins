@@ -1,0 +1,8 @@
+{
+  "format": 1,
+  "id": "agent-sessions",
+  "version": "1.0.0",
+  "title": "Сессии агента",
+  "description": "Минимальное рабочее место: проекты и сессии Claude Code во вкладках с делегированием, изоляцией и уведомлениями.",
+  "plugins": ["projects", "agent-claude-code", "sessions", "session-isolation", "session-notifications"]
+}

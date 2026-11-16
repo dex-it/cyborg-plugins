@@ -143,10 +143,14 @@ describe('shell и медленный git', () => {
     using box = toolbox({ slowGit: 0.5 });
     assert.ok(box.env.PATH?.startsWith(`${box.bin}:${path.join(box.root, 'slow-git')}`));
     // Время сравнивается друг с другом, а не с порогом: под нагрузкой параллельного прогона абсолютные пороги ненадёжны.
-    const t0 = Date.now();
-    const status = box.run('git', ['status', '--short'], { cwd: repo.dir });
-    const fast = Date.now() - t0;
-    assert.equal(status.status, 0);
+    // Быстрый вызов - минимум из трёх замеров: один холодный запуск git под нагрузкой может занять столько же, сколько задержка.
+    let fast = Infinity;
+    for (let i = 0; i < 3; i++) {
+      const t0 = Date.now();
+      const status = box.run('git', ['status', '--short'], { cwd: repo.dir });
+      fast = Math.min(fast, Date.now() - t0);
+      assert.equal(status.status, 0);
+    }
     const t1 = Date.now();
     const top = box.run('git', ['rev-parse', '--show-toplevel'], { cwd: repo.dir });
     const slow = Date.now() - t1;
