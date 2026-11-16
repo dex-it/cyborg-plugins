@@ -1,0 +1,427 @@
+[
+  {
+    "name": "bug",
+    "color": "d73a4a",
+    "description": "Something isn't working"
+  },
+  {
+    "name": "documentation",
+    "color": "0075ca",
+    "description": "Improvements or additions to documentation"
+  },
+  {
+    "name": "duplicate",
+    "color": "cfd3d7",
+    "description": "This issue or pull request already exists"
+  },
+  {
+    "name": "enhancement",
+    "color": "a2eeef",
+    "description": "New feature or request"
+  },
+  {
+    "name": "good first issue",
+    "color": "7057ff",
+    "description": "Good for newcomers"
+  },
+  {
+    "name": "help wanted",
+    "color": "008672",
+    "description": "Extra attention is needed"
+  },
+  {
+    "name": "invalid",
+    "color": "e4e669",
+    "description": "This doesn't seem right"
+  },
+  {
+    "name": "question",
+    "color": "d876e3",
+    "description": "Further information is requested"
+  },
+  {
+    "name": "wontfix",
+    "color": "ffffff",
+    "description": "This will not be worked on"
+  },
+  {
+    "name": "breaking-change",
+    "color": "b60205",
+    "description": "Ломает контракт, id плагина, состав бандла или формат данных"
+  },
+  {
+    "name": "category: agents",
+    "color": "bfe5bf",
+    "description": "Движки агентов: чем и как запускается сессия, как читается её история."
+  },
+  {
+    "name": "category: code",
+    "color": "bfe5bf",
+    "description": "Работа с репозиториями рядом с сессией: проекты, дерево файлов, просмотр, git, поиск."
+  },
+  {
+    "name": "category: extensions",
+    "color": "bfe5bf",
+    "description": "Управление тем, чем расширяется сам агент: магазины плагинов, скиллы, серверы MCP."
+  },
+  {
+    "name": "category: sessions",
+    "color": "bfe5bf",
+    "description": "Сессии агента и всё, что с ними связано: вкладки, терминал, изоляция, уведомления, подсказки следующ"
+  },
+  {
+    "name": "category: trackers",
+    "color": "bfe5bf",
+    "description": "Задачи, MR и статус проекта из внешних трекеров."
+  },
+  {
+    "name": "category: workbench",
+    "color": "bfe5bf",
+    "description": "Удобства окна, не привязанные к предметной области: кнопки-команды, замок окна."
+  },
+  {
+    "name": "component: bundle",
+    "color": "bfd4f2",
+    "description": "bundles/: бандлы, planned.json, проверка полноты"
+  },
+  {
+    "name": "component: catalog",
+    "color": "bfd4f2",
+    "description": "plugins/categories.json, карточки README, страницы каталога"
+  },
+  {
+    "name": "component: ci",
+    "color": "bfd4f2",
+    "description": ".github/: workflows, dependabot, метки"
+  },
+  {
+    "name": "component: docs",
+    "color": "bfd4f2",
+    "description": "docs/guide, README, CLAUDE.md"
+  },
+  {
+    "name": "component: plugin",
+    "color": "bfd4f2",
+    "description": "plugins/<категория>/<id>: манифест, код, вид, тесты, README плагина"
+  },
+  {
+    "name": "component: site",
+    "color": "bfd4f2",
+    "description": "site/: сборка сайта, меню, значок, og.png"
+  },
+  {
+    "name": "component: template",
+    "color": "bfd4f2",
+    "description": "templates/plugin: шаблон для npm run new"
+  },
+  {
+    "name": "component: tooling",
+    "color": "bfd4f2",
+    "description": "scripts/: проверки, сборка бандлов, new-plugin, harness:link, тесты скриптов"
+  },
+  {
+    "name": "credentials",
+    "color": "d93f0b",
+    "description": "Касается секретов, токенов, хранилища секретов"
+  },
+  {
+    "name": "dependencies",
+    "color": "0366d6",
+    "description": "Обновление зависимостей"
+  },
+  {
+    "name": "effort: l",
+    "color": "ededed",
+    "description": "Больше 8, рассмотрите декомпозицию"
+  },
+  {
+    "name": "effort: m",
+    "color": "ededed",
+    "description": "3-8 человеко-дней"
+  },
+  {
+    "name": "effort: s",
+    "color": "ededed",
+    "description": "До 2 человеко-дней"
+  },
+  {
+    "name": "epic",
+    "color": "5319e7",
+    "description": "Эпик"
+  },
+  {
+    "name": "external-binary",
+    "color": "f9d0c4",
+    "description": "Причина в стороннем бинаре (git, gh, glab, jira, claude), не в плагине"
+  },
+  {
+    "name": "javascript",
+    "color": "168700",
+    "description": "Правка JavaScript и TypeScript"
+  },
+  {
+    "name": "level: epic",
+    "color": "d876e3",
+    "description": "Уровень: зонт над несколькими задачами, сам не делается, декомпозируется"
+  },
+  {
+    "name": "level: story",
+    "color": "d876e3",
+    "description": "Уровень: крупная единица работы, закрывается несколькими PR"
+  },
+  {
+    "name": "level: subtask",
+    "color": "d876e3",
+    "description": "Уровень: часть story или task, отдельным PR не закрывается"
+  },
+  {
+    "name": "level: task",
+    "color": "d876e3",
+    "description": "Уровень: единица работы, обычно один PR"
+  },
+  {
+    "name": "platform: linux",
+    "color": "c2e0c6",
+    "description": "Касается только Linux"
+  },
+  {
+    "name": "platform: macos",
+    "color": "c2e0c6",
+    "description": "Касается только macOS, включая bash 3.2"
+  },
+  {
+    "name": "platform: windows",
+    "color": "c2e0c6",
+    "description": "Касается только Windows"
+  },
+  {
+    "name": "priority: critical",
+    "color": "b60205",
+    "description": "Каталог или сборка бандлов сломаны, поставка не собирается. Бросаем всё"
+  },
+  {
+    "name": "priority: high",
+    "color": "d93f0b",
+    "description": "Блокирует перенос ai-cyborg или других авторов. Текущий этап"
+  },
+  {
+    "name": "priority: low",
+    "color": "c5def5",
+    "description": "Косметика, редкий случай, идея на будущее"
+  },
+  {
+    "name": "priority: medium",
+    "color": "fbca04",
+    "description": "Мешает, но есть обходной путь. Ближайшие итерации"
+  },
+  {
+    "name": "regression",
+    "color": "e99695",
+    "description": "Работало в предыдущей версии плагина или бандла и сломалось"
+  },
+  {
+    "name": "stage: 0",
+    "color": "0e8a16",
+    "description": "Этап переноса ai-cyborg 0. Решения, общие фикстуры, матрица паритета"
+  },
+  {
+    "name": "stage: 1",
+    "color": "0e8a16",
+    "description": "Этап переноса ai-cyborg 1. Основа: projects, agent-claude-code, sessions"
+  },
+  {
+    "name": "stage: 2",
+    "color": "0e8a16",
+    "description": "Этап переноса ai-cyborg 2. Код: git, files, viewer, search"
+  },
+  {
+    "name": "stage: 3",
+    "color": "0e8a16",
+    "description": "Этап переноса ai-cyborg 3. Трекеры: trackers"
+  },
+  {
+    "name": "stage: 4",
+    "color": "0e8a16",
+    "description": "Этап переноса ai-cyborg 4. Остальное: claude-extensions, command-buttons, next-actions"
+  },
+  {
+    "name": "stage: 5",
+    "color": "0e8a16",
+    "description": "Этап переноса ai-cyborg 5. Сверка: бандл ai-cyborg, паритет"
+  },
+  {
+    "name": "status: blocked",
+    "color": "cfd3d7",
+    "description": "Заблокировано внешней причиной, укажите какой в комментарии"
+  },
+  {
+    "name": "status: done",
+    "color": "2da44e",
+    "description": "Задача: сделано"
+  },
+  {
+    "name": "status: duplicate",
+    "color": "ededed",
+    "description": "Дубликат, ссылка на оригинал в комментарии"
+  },
+  {
+    "name": "status: in progress",
+    "color": "fbca04",
+    "description": "Задача: в работе (ветка или черновик PR)"
+  },
+  {
+    "name": "status: in review",
+    "color": "8957e5",
+    "description": "Задача: PR на ревью"
+  },
+  {
+    "name": "status: in test",
+    "color": "5bc0eb",
+    "description": "Задача: на проверке"
+  },
+  {
+    "name": "status: needs-card",
+    "color": "cfd3d7",
+    "description": "В README плагина нет карточки или она не проходит npm run check"
+  },
+  {
+    "name": "status: needs-design",
+    "color": "cfd3d7",
+    "description": "Ждём решения по подходу: обсуждение, SAD или ADR до кода"
+  },
+  {
+    "name": "status: needs-info",
+    "color": "cfd3d7",
+    "description": "Ждём автора: версия, ОС, вывод команды"
+  },
+  {
+    "name": "status: needs-review",
+    "color": "cfd3d7",
+    "description": "PR ждёт ревью"
+  },
+  {
+    "name": "status: needs-testing",
+    "color": "cfd3d7",
+    "description": "Плагин не проверен вживую в приложении на ядре"
+  },
+  {
+    "name": "status: needs-triage",
+    "color": "cfd3d7",
+    "description": "Ещё не разобрано. Ставится на все новые issue"
+  },
+  {
+    "name": "status: needs-version-bump",
+    "color": "cfd3d7",
+    "description": "Плагин изменён без повышения version в manifest.json"
+  },
+  {
+    "name": "status: stale",
+    "color": "ededed",
+    "description": "Нет активности. Закрывается вручную при ревизии"
+  },
+  {
+    "name": "status: todo",
+    "color": "9e9e9e",
+    "description": "Задача: не начата"
+  },
+  {
+    "name": "status: wontfix",
+    "color": "ededed",
+    "description": "Осознанное решение не делать"
+  },
+  {
+    "name": "tech-debt",
+    "color": "fbca04",
+    "description": "Defects, checks, hygiene"
+  },
+  {
+    "name": "type: architecture",
+    "color": "5319e7",
+    "description": "Устройство репозитория: раскладка, формат бандла, правила каталога"
+  },
+  {
+    "name": "type: bug",
+    "color": "d73a4a",
+    "description": "Плагин, бандл или скрипт работают не так, как описано"
+  },
+  {
+    "name": "type: chore",
+    "color": "fef2c0",
+    "description": "Рутина: тесты, конфиги, зависимости, CI"
+  },
+  {
+    "name": "type: deprecation",
+    "color": "e4b429",
+    "description": "Вывод плагина из каталога или отказ от поддержки"
+  },
+  {
+    "name": "type: docs",
+    "color": "0075ca",
+    "description": "Только документация: README, docs/guide, сайт"
+  },
+  {
+    "name": "type: enhancement",
+    "color": "a2eeef",
+    "description": "Доработка существующего плагина, бандла или инфраструктуры"
+  },
+  {
+    "name": "type: feature",
+    "color": "1d76db",
+    "description": "Новая возможность репозитория: инструмент, проверка, формат бандла"
+  },
+  {
+    "name": "type: new-plugin",
+    "color": "0e8a16",
+    "description": "Добавление нового плагина или бандла в каталог"
+  },
+  {
+    "name": "type: plugin-request",
+    "color": "bfe5bf",
+    "description": "Запрос плагина, которого ещё нет в каталоге"
+  },
+  {
+    "name": "type: refactor",
+    "color": "0052cc",
+    "description": "Правка формы без изменения поведения"
+  },
+  {
+    "name": "type: research",
+    "color": "bfdadc",
+    "description": "Замер или проверка гипотезы: результат - вывод, правки кода может не быть"
+  },
+  {
+    "name": "type: security",
+    "color": "b60205",
+    "description": "Права плагина, секреты, supply chain, границы доверия"
+  },
+  {
+    "name": "upstream",
+    "color": "f9d0c4",
+    "description": "Причина в Cyborg Harness, Electron, node-pty, Node или стороннем сервисе; нужна ссылка на их issue"
+  },
+  {
+    "name": "размер: L",
+    "color": "f9d0c4",
+    "description": "больше 8 человеко-дней"
+  },
+  {
+    "name": "размер: M",
+    "color": "d4c5f9",
+    "description": "3-8 человеко-дней"
+  },
+  {
+    "name": "размер: S",
+    "color": "ededed",
+    "description": "до 2 человеко-дней"
+  },
+  {
+    "name": "решение",
+    "color": "b60205",
+    "description": "Нужно решение владельца или автора"
+  },
+  {
+    "name": "спайк",
+    "color": "c5def5",
+    "description": "Короткое исследование"
+  }
+]

@@ -41,4 +41,4 @@ sidebar:
 Всё, что умеет приложение ai-cyborg, но на ядре и плагинах: первая проверка на пригодность всей схемы.
 
 - Идентификатор: `ai-cyborg`
-- Плагины (13): `agent-claude-code`, `sessions`, `session-isolation`, `session-notifications`, `next-actions`, `projects`, `files`, `viewer`, `git`, `search`, `trackers`, `claude-extensions`, `command-buttons`
+- Плагины (14): `agent-claude-code`, `sessions`, `remote-sessions`, `session-isolation`, `session-notifications`, `next-actions`, `projects`, `files`, `viewer`, `git`, `search`, `trackers`, `claude-extensions`, `command-buttons`
