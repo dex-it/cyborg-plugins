@@ -37,5 +37,6 @@ export function catalogSidebar() {
     }
   }
   if (existsSync(path.join(CATALOG, 'bundles.md'))) items.push({ slug: 'catalog/bundles', label: 'Бандлы' });
+  if (existsSync(path.join(CATALOG, 'contracts.md'))) items.push({ slug: 'catalog/contracts', label: 'Карта контрактов' });
   return items;
 }

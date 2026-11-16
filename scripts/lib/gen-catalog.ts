@@ -5,6 +5,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, wri
 import path from 'node:path';
 import { checkRepo } from './check-all.ts';
 import { resolveBundle } from './bundles.ts';
+import { effectiveContracts } from './design.ts';
 import { providedVersions } from './semver.ts';
 import { isRecord } from './util.ts';
 import type { Problem } from './util.ts';
@@ -99,11 +100,40 @@ function bundlesPage(root: string): string {
   }
   if (bundles.planned.length > 0) {
     out += '## Запланированы\n\n';
+    const all = [...bundles.bundles.map((b) => ({ id: b.id, extends: b.extends, plugins: b.plugins })), ...bundles.planned.map((b) => ({ id: b.id, extends: b.extends, plugins: b.plugins }))];
     for (const b of bundles.planned) {
-      out += `### ${b.title}\n\n${b.summary}\n\n- Идентификатор: \`${b.id}\`\n- Плагины (${b.plugins.length}): ${b.plugins.map(link).join(', ')}\n\n`;
+      const ids = resolveBundle(b.id, all, problems);
+      out += `### ${b.title}\n\n${b.summary}\n\n- Идентификатор: \`${b.id}\`\n`;
+      if (b.extends.length > 0) out += `- Включает бандлы: ${code(b.extends)}\n`;
+      out += `- Плагины (${ids.length}): ${ids.map(link).join(', ')}\n\n`;
     }
   }
   return out.trimEnd() + '\n';
+}
+
+function contractsPage(root: string): string {
+  const { catalog, design } = checkRepo(root);
+  const effective = effectiveContracts(catalog, design);
+  const names = new Set<string>(Object.keys(design.contracts));
+  for (const e of effective.values()) for (const f of ['provides', 'requires', 'optional', 'consumes'] as const) for (const n of Object.keys(e[f] ?? {})) names.add(n);
+  const link = (id: string): string => {
+    const p = catalog.plugins.find((x) => x.id === id);
+    return p ? `[\`${id}\`](/catalog/${p.category}/${p.id}/)` : `\`${id}\``;
+  };
+  const who = (name: string, field: 'provides' | 'requires' | 'optional' | 'consumes'): string => {
+    const ids = [...effective].filter(([, e]) => name in (e[field] ?? {})).map(([id]) => id).sort();
+    return ids.length > 0 ? ids.map(link).join(', ') : '-';
+  };
+  let out = front('Карта контрактов', 'Какой плагин какие контракты cyborg.* даёт и берёт: по манифестам готовых плагинов и проектной модели запланированных.', 91);
+  out += 'Плагины общаются только контрактами. Для готового плагина строка строится по его `manifest.json`, для запланированного - по проектной модели `plugins/planned-contracts.json`; поэтому карта полна с первого дня и сама заменяется настоящими данными по мере переноса. Пробелы относительно типов ядра показывает `npm run contracts:gap`.\n\n';
+  out += '| Контракт | Даёт | Требует | Использует, если есть | Собирает у всех | Нужные члены |\n|---|---|---|---|---|---|\n';
+  for (const name of [...names].sort()) {
+    const members = design.contracts[name]?.members ?? [];
+    out += `| \`${name}\` | ${who(name, 'provides')} | ${who(name, 'requires')} | ${who(name, 'optional')} | ${who(name, 'consumes')} | ${members.length > 0 ? members.map((m) => `\`${m}\``).join(', ') : '-'} |\n`;
+  }
+  const planned = [...effective].filter(([, e]) => e.source === 'design').length;
+  out += `\nГотовых плагинов в карте ${effective.size - planned}, по проектной модели ${planned}.\n`;
+  return out;
 }
 
 function indexPage(root: string): string {
@@ -130,6 +160,7 @@ export function generatePages(root: string): Map<string, string> {
     plugins.forEach((p, j) => pages.set(`${c.id}/${p.id}.md`, pluginPage(p, c, j + 1)));
   });
   pages.set('bundles.md', bundlesPage(root));
+  pages.set('contracts.md', contractsPage(root));
   return pages;
 }
 

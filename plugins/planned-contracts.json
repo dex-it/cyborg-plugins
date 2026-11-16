@@ -1,0 +1,32 @@
+{
+  "contracts": {
+    "cyborg.projects": {"members": ["list", "selected", "onChange", "roots"]},
+    "cyborg.project-settings": {"members": ["section", "validate", "onChange"]},
+    "cyborg.editor": {"members": ["open", "openWithValidation"]},
+    "cyborg.sessions": {"members": ["onChange", "reveal", "create", "send", "paste", "labels", "uses"]},
+    "cyborg.git": {"members": ["status", "onChange", "root", "branch", "headContent", "branches", "switch", "remotes", "files"]},
+    "cyborg.session-prompt": {"members": ["fragment", "order"]},
+    "cyborg.agent": {"members": ["facts", "launch", "watch", "ended", "history"]},
+    "cyborg.agent-tool": {"members": ["tools", "call"]},
+    "cyborg.tree-decoration": {"members": ["marks", "onChange"]}
+  },
+  "plugins": {
+    "projects": {"provides": {"cyborg.projects": "1.0"}, "consumes": {"cyborg.project-settings": "^1"}},
+    "agent-claude-code": {"provides": {"cyborg.agent": "1.0"}, "optional": {"cyborg.projects": "^1"}},
+    "sessions": {"provides": {"cyborg.sessions": "1.2"}, "requires": {"cyborg.projects": "^1"}, "consumes": {"cyborg.agent": "^1", "cyborg.session-prompt": "^1", "cyborg.agent-tool": "^1"}},
+    "remote-sessions": {"provides": {"cyborg.agent": "1.0", "cyborg.project-settings": "1.0"}, "optional": {"cyborg.projects": "^1"}},
+    "session-isolation": {"provides": {"cyborg.session-prompt": "1.0"}},
+    "session-notifications": {"requires": {"cyborg.sessions": "^1"}},
+    "next-actions": {"provides": {"cyborg.agent-tool": "1.0", "cyborg.session-prompt": "1.0"}},
+    "git": {"provides": {"cyborg.git": "1.0", "cyborg.tree-decoration": "1.0"}, "optional": {"cyborg.sessions": "^1"}},
+    "files": {"requires": {"cyborg.projects": "^1"}, "optional": {"cyborg.sessions": "^1", "cyborg.git": "^1"}, "consumes": {"cyborg.tree-decoration": "^1"}},
+    "viewer": {"provides": {"cyborg.editor": "1.0"}, "optional": {"cyborg.git": "^1"}},
+    "search": {"requires": {"cyborg.projects": "^1"}, "optional": {"cyborg.git": "^1"}},
+    "trackers": {"provides": {"cyborg.project-settings": "1.0"}, "requires": {"cyborg.projects": "^1", "cyborg.sessions": "^1", "cyborg.git": "^1"}},
+    "claude-extensions": {"optional": {"cyborg.projects": "^1"}},
+    "command-buttons": {"requires": {"cyborg.sessions": "^1"}, "optional": {"cyborg.git": "^1", "cyborg.editor": "^1"}},
+    "agent-shell": {"provides": {"cyborg.agent": "1.0"}},
+    "trackers-http": {"provides": {"cyborg.project-settings": "1.0"}, "requires": {"cyborg.projects": "^1", "cyborg.sessions": "^1"}},
+    "pin-lock": {}
+  }
+}

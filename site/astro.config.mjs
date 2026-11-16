@@ -95,7 +95,7 @@ export default defineConfig({
         },
         {
           label: 'Разработка',
-          items: [{ slug: 'development', label: 'Обзор' }, 'development/roadmap', 'development/labels', 'development/ci', 'development/harness', 'development/docs-site'],
+          items: [{ slug: 'development', label: 'Обзор' }, 'development/roadmap', 'development/labels', 'development/contracts', 'development/ci', 'development/harness', 'development/docs-site'],
         },
         { label: 'Вопросы', items: ['faq'] },
       ],
