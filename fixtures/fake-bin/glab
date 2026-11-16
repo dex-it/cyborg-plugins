@@ -1,0 +1,42 @@
+#!/bin/sh
+# Настройки (FAKE_*) можно положить в файл fake.env рядом со скриптом: ядро передаёт процессам плагина только PATH, HOME, локаль и названное в правиле env,
+# поэтому до подставной программы, запущенной плагином, переменные тестов не доходят. Внешние переменные главнее значений из файла.
+_fd=$(dirname "$0"); [ -f "$_fd/fake.env" ] && . "$_fd/fake.env"
+# Подставной glab (по образцу gh): формы ответов - как у GitLab REST, которые читают trackers.ts, mrs.ts и task-details.ts ai-cyborg.
+# FAKE_GLAB=data: вход выполнен (пользователь fake-user), без него `auth status` отвечает «No token provided», а api - 401;
+# FAKE_GLAB_HOST - хост (по умолчанию gitlab.example.com); FAKE_GLAB_ITEMS - число задач и MR в списках (30); FAKE_GLAB_LOG - журнал вызовов.
+[ -n "$FAKE_GLAB_LOG" ] && echo "$*" >> "$FAKE_GLAB_LOG"
+host=${FAKE_GLAB_HOST:-gitlab.example.com}
+if [ "$1 $2" = "auth status" ]; then
+  # Настоящий glab пишет это в stderr и выходит с кодом 0.
+  if [ "$FAKE_GLAB" = data ]; then
+    printf '%s\n  ✓ Logged in to %s as fake-user (/home/fake/.config/glab-cli/config.yml)\n  ✓ Token found: **********\n' "$host" "$host" >&2
+  else
+    printf '%s\n  x No token provided\n' "$host" >&2
+  fi
+  exit 0
+fi
+if [ "$FAKE_GLAB" != data ]; then
+  echo '{"message":"401 Unauthorized"}'
+  exit 0
+fi
+[ "$1" = api ] || { echo "fake glab: неизвестный вызов: $*" >&2; exit 1; }
+n=${FAKE_GLAB_ITEMS:-30}
+sha=0123456789abcdef0123456789abcdef01234567
+issue() { printf '{"iid":%s,"title":"Задача %s","state":"opened","web_url":"https://%s/acme/demo/-/issues/%s","created_at":"2026-10-01T10:00:00Z","updated_at":"2026-10-2%sT10:00:00Z","author":{"username":"fake-user"},"assignees":[{"username":"fake-user"}],"labels":["bug"],"description":"Описание задачи %s"}' "$1" "$1" "$host" "$1" "$(($1 % 10))" "$1"; }
+mr() {
+  author=fake-user; reviewers='[]'
+  if [ $(($1 % 2)) -eq 0 ]; then author=colleague; reviewers='[{"username":"fake-user"}]'; fi
+  printf '{"iid":%s,"title":"MR %s","state":"opened","draft":false,"web_url":"https://%s/acme/demo/-/merge_requests/%s","created_at":"2026-10-01T10:00:00Z","updated_at":"2026-10-2%sT10:00:00Z","author":{"username":"%s"},"assignees":[],"reviewers":%s,"source_branch":"feat-%s","target_branch":"main","sha":"%s","head_pipeline":{"status":"success"}}' "$1" "$1" "$host" "$1" "$(($1 % 10))" "$author" "$reviewers" "$1" "$sha"
+}
+list_of() { printf '['; i=1; while [ "$i" -le "$1" ]; do [ "$i" -gt 1 ] && printf ','; "$2" "$i"; i=$((i + 1)); done; printf ']\n'; }
+for arg in "$@"; do last=$arg; done
+case "$last" in
+  projects/*/issues\?*) list_of "$n" issue;;
+  projects/*/issues/[0-9]*) issue "${last##*/}"; echo;;
+  projects/*/merge_requests\?*) list_of "$n" mr;;
+  projects/*/merge_requests/[0-9]*) mr "${last##*/}"; echo;;
+  fullPath=*|query=*) echo '{"data":{"project":{"mergeRequests":{"pageInfo":{"hasNextPage":false,"endCursor":null},"nodes":[]}}}}';;
+  user) echo '{"username":"fake-user"}';;
+  *) echo "fake glab: неизвестный вызов: $*" >&2; exit 1;;
+esac
