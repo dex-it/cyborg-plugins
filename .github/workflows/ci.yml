@@ -51,6 +51,19 @@ jobs:
       - name: Ссылки на собранное ядро
         run: npm run harness:link -- .harness
       - run: npm run check
+      # Матрица паритета сверяется с настоящим кодом ai-cyborg на якорном коммите (parity/matrix.json): новое и исчезнувшее видно сразу.
+      - name: якорный коммит ai-cyborg
+        id: anchor
+        run: echo "sha=$(node -p "require('./parity/matrix.json').source.commit")" >> "$GITHUB_OUTPUT"
+      - name: ai-cyborg (клон на якорном коммите)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: dex-it/ai-cyborg
+          ref: ${{ steps.anchor.outputs.sha }}
+          path: .ai-cyborg
+          persist-credentials: false
+      - name: паритет (матрица сходится с кодом ai-cyborg)
+        run: npm run parity -- .ai-cyborg
       - run: npm run check:plugins
       - run: npm run typecheck
       - run: npm test

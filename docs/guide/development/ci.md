@@ -26,6 +26,8 @@ flowchart LR
 
 Пока пакеты ядра не опубликованы, CI забирает [cyborg-harness](https://github.com/dex-it/cyborg-harness) в `.harness/` на ссылке из переменной репозитория `HARNESS_REF` (по умолчанию `master`), ставит его зависимости без скриптов и собирает пакеты (`npm run build:packages`). Затем `npm run harness:link .harness` кладёт ссылки в `node_modules`. После выпуска пакетов эти шаги заменит обычный `npm ci`.
 
+Шаг «паритет» клонирует [ai-cyborg](https://github.com/dex-it/ai-cyborg) на якорном коммите из `parity/matrix.json` в `.ai-cyborg/` и запускает `npm run parity -- .ai-cyborg`: матрица обязана сходиться с настоящим кодом приложения ([карта переноса](/development/roadmap/)).
+
 Проверки идут на `macos-latest` и `ubuntu-24.04`: плагины работают с терминалами и путями, различия систем нужно видеть сразу.
 
 ## docs-site.yml

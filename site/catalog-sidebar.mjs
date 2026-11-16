@@ -38,5 +38,6 @@ export function catalogSidebar() {
   }
   if (existsSync(path.join(CATALOG, 'bundles.md'))) items.push({ slug: 'catalog/bundles', label: 'Бандлы' });
   if (existsSync(path.join(CATALOG, 'contracts.md'))) items.push({ slug: 'catalog/contracts', label: 'Карта контрактов' });
+  if (existsSync(path.join(CATALOG, 'parity.md'))) items.push({ slug: 'catalog/parity', label: 'Паритет с ai-cyborg' });
   return items;
 }
