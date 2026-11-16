@@ -4,6 +4,7 @@
     "title": "Сессии агента",
     "summary": "Минимальное рабочее место: сессии Claude Code во вкладках с уведомлениями и изоляцией.",
     "plugins": [
+      "projects",
       "agent-claude-code",
       "sessions",
       "session-isolation",
