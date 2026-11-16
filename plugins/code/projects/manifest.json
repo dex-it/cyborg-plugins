@@ -1,0 +1,37 @@
+{
+  "$schema": "../../../node_modules/@cyborg-harness/contracts/manifest.schema.json",
+  "id": "projects",
+  "version": "1.0.0",
+  "engines": { "cyborg": "^1" },
+  "provides": { "cyborg.projects": "1.0" },
+  "consumes": { "cyborg.project-settings": "^1" },
+  "commands": {
+    "projects.new": { "callers": "plugins" },
+    "projects.edit": { "args": ["string?"], "callers": "plugins" },
+    "projects.select": { "args": ["string"], "callers": "plugins" },
+    "projects.remove": { "args": ["string"] },
+    "projects.pick-dir": {},
+    "projects.load": {},
+    "projects.problem": {},
+    "projects.save": { "args": ["record"] },
+    "projects.form": { "args": ["string?"] }
+  },
+  "contributes": {
+    "menus": [
+      { "id": "new", "menu": "workspace", "title": "Новый проект…", "command": "projects.new", "order": 100 },
+      { "id": "properties", "menu": "workspace", "title": "Свойства проекта…", "command": "projects.edit", "order": 110, "enabled": { "contract": "cyborg.projects", "major": 1, "member": "hasSelected" } }
+    ]
+  },
+  "permissions": {
+    "fs.read": ["granted"],
+    "security.roots": true
+  },
+  "config": { "version": 1, "schema": "./config.schema.json" },
+  "state": { "version": 1, "schema": "./state.schema.json" },
+  "ui": {
+    "views": {
+      "projects": { "module": "./ui/projects.js", "area": "sidebar", "title": "Проекты" },
+      "project-form": { "module": "./ui/project-form.js", "area": "modal", "title": "Свойства проекта" }
+    }
+  }
+}

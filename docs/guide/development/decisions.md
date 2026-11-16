@@ -96,7 +96,7 @@ description: "Решения владельца, блокировавшие пе
 
 ## 11. Типы `cyborg.*`, которых нет в ядре
 
-**Решение.** Пока контракт не объявлен в `@cyborg-harness/contracts` ([карта контрактов](/development/contracts/): `cyborg.projects`, `cyborg.project-settings`, `cyborg.editor`), плагин объявляет его тип сам через `declare module '@cyborg-harness/contracts'` (как шаблон плагина), общие объявления лежат в `contracts/` этого репозитория (появится вместе с M-01) и переезжают в пакет ядра по мере готовности.
+**Решение.** Пока контракт не объявлен в `@cyborg-harness/contracts` ([карта контрактов](/development/contracts/): `cyborg.projects`, `cyborg.project-settings`, `cyborg.editor`), плагин объявляет его тип сам через `declare module '@cyborg-harness/contracts'` (как шаблон плагина), общие объявления лежат в `contracts/` этого репозитория (пакет `@cyborg-plugins/contracts`, появился с M-01) и переезжают в пакет ядра по мере готовности.
 
 **Почему.** Это не блокирует M-01 на задаче в другом репозитории. Правило ядра запрещает отдавать `cyborg.*` только плагинам вне поставки; объявлять типы можно.
 
