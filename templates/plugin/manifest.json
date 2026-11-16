@@ -1,0 +1,11 @@
+{
+  "$schema": "../../../node_modules/@cyborg-harness/contracts/manifest.schema.json",
+  "id": "__ID__",
+  "version": "1.0.0",
+  "engines": { "cyborg": "^1" },
+  "provides": { "__ID__.greeting": "1.0" },
+  "commands": { "__ID__.hello": {} },
+  "keybindings": [{ "key": "CmdOrCtrl+Shift+E", "command": "__ID__.hello" }],
+  "config": { "version": 1, "schema": "./config.schema.json" },
+  "ui": { "views": { "main": "./ui/ui.js" } }
+}

@@ -1,0 +1,62 @@
+name: CI
+
+# Проверки репозитория плагинов. Пакеты ядра ещё не опубликованы (P-10 ядра), поэтому ядро забирается из клона
+# и собирается здесь; ветка или тег ядра - переменная репозитория HARNESS_REF (по умолчанию master).
+# Когда пакеты выйдут, шаги «Ядро» и `harness:link` заменит обычный `npm ci`.
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-24.04]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Ядро (клон)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: dex-it/cyborg-harness
+          ref: ${{ vars.HARNESS_REF || 'master' }}
+          path: .harness
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            .harness/package-lock.json
+      - name: Ядро (сборка пакетов)
+        working-directory: .harness
+        run: |
+          npm ci --ignore-scripts
+          npm run build:packages
+      - run: npm ci
+      - name: Ссылки на собранное ядро
+        run: npm run harness:link -- .harness
+      - run: npm run check
+      - run: npm run check:plugins
+      - run: npm run typecheck
+      - run: npm test
+      # Страницы каталога сайта строятся из карточек и манифестов: правка без `npm run docs:catalog` красит шаг.
+      - name: страницы каталога (свежесть)
+        run: npm run check:docs-catalog
+      # Бандлы собираются целиком настоящим cyborg-plugin: поставка, bundle.json, config.json и архивы.
+      - name: бандлы (сборка и упаковка)
+        run: npm run bundle -- --all --pack

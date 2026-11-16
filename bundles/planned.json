@@ -1,0 +1,26 @@
+[
+  {
+    "id": "agent-sessions",
+    "title": "Сессии агента",
+    "summary": "Минимальное рабочее место: сессии Claude Code во вкладках с уведомлениями и изоляцией.",
+    "plugins": ["agent-claude-code", "sessions", "session-isolation", "session-notifications"]
+  },
+  {
+    "id": "code-workspace",
+    "title": "Работа с кодом",
+    "summary": "Проекты, дерево файлов, просмотр, git и поиск рядом с сессией.",
+    "plugins": ["projects", "files", "viewer", "git", "search"]
+  },
+  {
+    "id": "task-trackers",
+    "title": "Задачи и MR",
+    "summary": "Задачи и MR из GitHub, GitLab и Jira, карточка «Статус».",
+    "plugins": ["trackers"]
+  },
+  {
+    "id": "ai-cyborg",
+    "title": "AI Cyborg",
+    "summary": "Всё, что умеет приложение ai-cyborg, но на ядре и плагинах: первая проверка на пригодность всей схемы.",
+    "plugins": ["agent-claude-code", "sessions", "session-isolation", "session-notifications", "next-actions", "projects", "files", "viewer", "git", "search", "trackers", "claude-extensions", "command-buttons"]
+  }
+]

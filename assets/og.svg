@@ -1,0 +1,123 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <title>Cyborg Plugins: плагины и бандлы для приложений на ядре Cyborg Harness</title>
+  <defs>
+    <linearGradient id="og-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1b2231"/>
+      <stop offset="1" stop-color="#0e121a"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#og-bg)"/>
+  <!-- Значок целиком: тот же, что assets/icon.svg -->
+  <svg x="70" y="95" width="440" height="440" viewBox="0 0 1024 1024">
+    <defs>
+    <!-- Плитка: та же, что у Cyborg Harness -->
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2d3850"/>
+      <stop offset="1" stop-color="#121722"/>
+    </linearGradient>
+    <!-- Модуль «человек»: светлый -->
+    <linearGradient id="human" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f4f7fb"/>
+      <stop offset="1" stop-color="#d5deea"/>
+    </linearGradient>
+    <!-- Модуль «машина»: синий -->
+    <linearGradient id="machine" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#58a9ff"/>
+      <stop offset="1" stop-color="#2f78d8"/>
+    </linearGradient>
+    <!-- Глаз ядра, уменьшенный: левая половина светлая, правая стальная -->
+    <linearGradient id="core-human" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f4f7fb"/>
+      <stop offset="1" stop-color="#d5deea"/>
+    </linearGradient>
+    <linearGradient id="core-machine" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#7f8fa9"/>
+      <stop offset="1" stop-color="#56637b"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#ffb36b" stop-opacity="0.95"/>
+      <stop offset="0.5" stop-color="#ff8a3d" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#ff8a3d" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="left"><rect x="0" y="0" width="512" height="1024"/></clipPath>
+    <clipPath id="right"><rect x="512" y="0" width="512" height="1024"/></clipPath>
+  </defs>
+
+  <!-- Плитка -->
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#tile)"/>
+  <rect x="104" y="104" width="816" height="816" rx="181" fill="none" stroke="#ffffff" stroke-opacity="0.08" stroke-width="8"/>
+
+  <!-- Модули. Сетка 3x3: слева светлые («человек»), справа синие («машина»), средний столбец разрезан швом пополам.
+       В центре гнездо ядра, поэтому модулей восемь -->
+  <g>
+    <rect x="192" y="192" width="196" height="196" rx="48" fill="url(#human)"/>
+    <rect x="192" y="414" width="196" height="196" rx="48" fill="url(#human)"/>
+    <rect x="192" y="636" width="196" height="196" rx="48" fill="url(#human)"/>
+    <rect x="636" y="192" width="196" height="196" rx="48" fill="url(#machine)"/>
+    <rect x="636" y="414" width="196" height="196" rx="48" fill="url(#machine)"/>
+    <rect x="636" y="636" width="196" height="196" rx="48" fill="url(#machine)"/>
+    <g clip-path="url(#left)">
+      <rect x="414" y="192" width="196" height="196" rx="48" fill="url(#human)"/>
+      <rect x="414" y="636" width="196" height="196" rx="48" fill="url(#human)"/>
+    </g>
+    <g clip-path="url(#right)">
+      <rect x="414" y="192" width="196" height="196" rx="48" fill="url(#machine)"/>
+      <rect x="414" y="636" width="196" height="196" rx="48" fill="url(#machine)"/>
+    </g>
+  </g>
+
+  <!-- Содержимое модулей: полоса заголовка и порт, как у видов плагинов -->
+  <g fill="#121722" fill-opacity="0.5">
+    <rect x="216" y="220" width="70" height="15" rx="7.5"/>
+    <rect x="216" y="442" width="70" height="15" rx="7.5"/>
+    <rect x="216" y="664" width="70" height="15" rx="7.5"/>
+    <rect x="438" y="220" width="70" height="15" rx="7.5"/>
+    <rect x="438" y="664" width="70" height="15" rx="7.5"/>
+    <rect x="660" y="220" width="70" height="15" rx="7.5"/>
+    <rect x="660" y="442" width="70" height="15" rx="7.5"/>
+    <rect x="660" y="664" width="70" height="15" rx="7.5"/>
+    <circle cx="354" cy="354" r="13"/>
+    <circle cx="354" cy="576" r="13"/>
+    <circle cx="354" cy="798" r="13"/>
+    <circle cx="576" cy="354" r="13" clip-path="url(#right)"/>
+    <circle cx="576" cy="798" r="13" clip-path="url(#right)"/>
+    <circle cx="798" cy="576" r="13"/>
+    <circle cx="798" cy="798" r="13"/>
+  </g>
+  <!-- Оранжевая точка: единственный акцент, как у ядра -->
+  <circle cx="798" cy="354" r="13" fill="#ff8a3d"/>
+
+  <!-- Гнездо ядра и его глаз в малом размере -->
+  <circle cx="512" cy="512" r="98" fill="#121722" fill-opacity="0.92"/>
+  <circle cx="512" cy="512" r="98" fill="none" stroke="#ffffff" stroke-opacity="0.12" stroke-width="6"/>
+  <g clip-path="url(#left)"><circle cx="512" cy="512" r="76" fill="url(#core-human)"/></g>
+  <g clip-path="url(#right)"><circle cx="512" cy="512" r="76" fill="url(#core-machine)"/></g>
+  <g clip-path="url(#right)">
+    <circle cx="512" cy="512" r="72" fill="none" stroke="#3794ff" stroke-width="8"/>
+    <circle cx="512" cy="512" r="48" fill="none" stroke="#3794ff" stroke-width="6"/>
+  </g>
+  <g clip-path="url(#left)">
+    <circle cx="512" cy="512" r="48" fill="none" stroke="#121722" stroke-opacity="0.45" stroke-width="6"/>
+  </g>
+  <circle cx="512" cy="512" r="72" fill="url(#glow)" clip-path="url(#right)"/>
+  <g clip-path="url(#left)"><circle cx="512" cy="512" r="23" fill="#121722"/></g>
+  <g clip-path="url(#right)"><circle cx="512" cy="512" r="23" fill="#fff1e3"/></g>
+
+  <!-- Шов между половинами проходит через весь значок, как у ядра -->
+  <rect x="508" y="192" width="8" height="640" fill="#121722"/>
+  </svg>
+  <g font-family="-apple-system, 'Helvetica Neue', Helvetica, Arial, sans-serif">
+    <text x="560" y="262" font-size="74" font-weight="700" fill="#f4f7fb">Cyborg Plugins</text>
+    <text x="562" y="330" font-size="34" fill="#aab6c8">Плагины и бандлы для приложений</text>
+    <text x="562" y="376" font-size="34" fill="#aab6c8">на ядре Cyborg Harness</text>
+    <g font-size="26" font-weight="600">
+      <rect x="562" y="430" width="150" height="48" rx="24" fill="#e9eef5" fill-opacity="0.14"/>
+      <text x="637" y="463" text-anchor="middle" fill="#e9eef5">каталог</text>
+      <rect x="728" y="430" width="150" height="48" rx="24" fill="#3794ff" fill-opacity="0.22"/>
+      <text x="803" y="463" text-anchor="middle" fill="#8dc2ff">бандлы</text>
+      <rect x="894" y="430" width="210" height="48" rx="24" fill="#ff8a3d" fill-opacity="0.2"/>
+      <text x="999" y="463" text-anchor="middle" fill="#ffb784">свои плагины</text>
+    </g>
+    <text x="562" y="540" font-size="24" fill="#6f7d92">github.com/dex-it/cyborg-plugins</text>
+  </g>
+</svg>
