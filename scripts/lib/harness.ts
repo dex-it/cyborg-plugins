@@ -22,6 +22,9 @@ export function findCyborgPlugin(root: string = REPO_ROOT): string {
   );
 }
 
+/** Пакет объявлений типов репозитория (contracts/): из него в код плагина разрешён только `import type`. Исчезнет, когда типы переедут в пакет ядра (cyborg-harness#256). */
+export const DECLARATION_FLAGS: readonly string[] = ['--declarations-package', '@cyborg-plugins/contracts'];
+
 export interface RunResult {
   status: number;
 }

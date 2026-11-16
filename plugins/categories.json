@@ -14,7 +14,6 @@
     "planned": [
       { "id": "sessions", "summary": "Вкладки сессий в терминале ядра, делегирование дочерним сессиям, MCP-сервер сессий", "from": "ai-cyborg" },
       { "id": "remote-sessions", "summary": "Удалённые сессии Claude Code по SSH: хосты проекта, агент на хосте, клоны, обрыв и подхват, MCP-туннель, голосовой ввод", "from": "ai-cyborg" },
-      { "id": "session-isolation", "summary": "Параллельные сессии в одном репозитории уходят каждая в свой worktree", "from": "ai-cyborg" },
       { "id": "session-notifications", "summary": "Уведомление, когда сессия ждёт человека", "from": "ai-cyborg" },
       { "id": "next-actions", "summary": "Кнопки следующих шагов, которые предлагает модель", "from": "ai-cyborg" }
     ]
@@ -24,7 +23,6 @@
     "title": "Код",
     "summary": "Работа с репозиториями рядом с сессией: проекты, дерево файлов, просмотр, git, поиск.",
     "planned": [
-      { "id": "projects", "summary": "Проекты: набор локальных репозиториев под одним именем", "from": "ai-cyborg" },
       { "id": "files", "summary": "Дерево файлов сессии с отметками git", "from": "ai-cyborg" },
       { "id": "viewer", "summary": "Просмотр файлов с подсветкой, сравнение с HEAD, правка Markdown, запуск файла в системном терминале", "from": "ai-cyborg" },
       { "id": "git", "summary": "Ветка, статус, смена ветки, содержимое HEAD", "from": "ai-cyborg" },
