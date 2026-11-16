@@ -1,0 +1,7 @@
+{
+  "$schema": "../../../node_modules/@cyborg-harness/contracts/manifest.schema.json",
+  "id": "session-isolation",
+  "version": "1.0.0",
+  "engines": { "cyborg": "^1" },
+  "provides": { "cyborg.session-prompt": "1.0" }
+}

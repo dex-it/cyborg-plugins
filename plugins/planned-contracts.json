@@ -15,7 +15,6 @@
     "agent-claude-code": {"provides": {"cyborg.agent": "1.0"}, "optional": {"cyborg.projects": "^1"}},
     "sessions": {"provides": {"cyborg.sessions": "1.2"}, "requires": {"cyborg.projects": "^1"}, "consumes": {"cyborg.agent": "^1", "cyborg.session-prompt": "^1", "cyborg.agent-tool": "^1"}},
     "remote-sessions": {"provides": {"cyborg.agent": "1.0", "cyborg.project-settings": "1.0"}, "optional": {"cyborg.projects": "^1"}},
-    "session-isolation": {"provides": {"cyborg.session-prompt": "1.0"}},
     "session-notifications": {"requires": {"cyborg.sessions": "^1"}},
     "next-actions": {"provides": {"cyborg.agent-tool": "1.0", "cyborg.session-prompt": "1.0"}},
     "git": {"provides": {"cyborg.git": "1.0", "cyborg.tree-decoration": "1.0"}, "optional": {"cyborg.sessions": "^1"}},
