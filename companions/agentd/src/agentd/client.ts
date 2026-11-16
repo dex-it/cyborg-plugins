@@ -6,15 +6,19 @@
 //
 //   client.js rpc            строки JSON со стандартного ввода уходят демону, ответы (сообщения с rid) печатаются строками в stdout;
 //                            выход, когда на каждый rid пришёл ответ (или по сроку). Один вызов `ssh host sh rpc.sh` = пачка запросов.
-//   client.js attach <sid> <instance> [cols rows]
+//   client.js attach <sid> <instance> [cols rows] [--fwd=<сокет> --upstream=<сокет> --mcp-port=<порт>]
 //                            терминал сессии: вывод демона (`data`, `reset`) - в stdout, ввод - сообщениями `input`, размер - `resize`.
-//                            Запускается как `ssh -tt host sh attach.sh <sid> <instance>`: pty потребителя - это и есть терминал сессии.
+//                            Туннель MCP: `ssh -R <upstream>:127.0.0.1:<mcp-port>` выводит сервер MCP Cyborg на unix-сокет хоста (upstream). Клиент слушает свой сокет
+//                            (--fwd, его демон берёт из hello.fwd и гонит туда запросы агента) и передаёт их на upstream, подставляя Host сервера: ядро принимает
+//                            только `127.0.0.1:<свой порт>` (см. http-host.ts). Вкладка закрыта - клиент вышел - туннеля нет.
+//                            Запускается как `ssh -tt host sh client.sh attach <sid> <instance>`: pty потребителя - это и есть терминал сессии.
 //                            Закрытие вкладки обрывает ssh и клиент, а сессия на хосте живёт дальше (подхват - новый attach).
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
+import { HostRewriter } from './http-host';
 
 const PROTO = 2;
 const run = path.join(os.homedir(), '.cyborg', 'run');
@@ -117,7 +121,37 @@ async function rpc(): Promise<void> {
   });
 }
 
-async function attach(sid: string, instance: string, size?: { cols: number; rows: number }): Promise<void> {
+interface Tunnel {
+  /** Сокет, который слушает клиент и отдаёт демону. */
+  fwd: string;
+  /** Сокет `ssh -R` на хосте. */
+  upstream: string;
+  port: number;
+}
+
+function listenTunnel(t: Tunnel): net.Server {
+  fs.rmSync(t.fwd, { force: true });
+  const server = net.createServer((client) => {
+    const up = net.connect(t.upstream);
+    const rewrite = new HostRewriter(`127.0.0.1:${String(t.port)}`);
+    client.on('data', (chunk) => up.write(rewrite.push(chunk)));
+    up.pipe(client);
+    client.on('error', () => up.destroy());
+    up.on('error', () => client.destroy());
+    client.on('close', () => up.destroy());
+    up.on('close', () => client.destroy());
+  });
+  server.listen(t.fwd, () => fs.chmodSync(t.fwd, 0o600));
+  const quit = (): void => {
+    server.close();
+    fs.rmSync(t.fwd, { force: true });
+  };
+  process.on('exit', quit);
+  return server;
+}
+
+async function attach(sid: string, instance: string, size?: { cols: number; rows: number }, tunnel?: Tunnel, fwd?: string): Promise<void> {
+  if (tunnel) await new Promise<void>((resolve) => listenTunnel(tunnel).once('listening', resolve));
   const socket = await connect();
   const send = (msg: Msg | Record<string, unknown>): void => void socket.write(JSON.stringify(msg) + '\n');
   const cols = (): number => size?.cols ?? process.stdout.columns ?? 80;
@@ -161,7 +195,7 @@ async function attach(sid: string, instance: string, size?: { cols: number; rows
   }));
   socket.on('close', () => process.exit(exitCode ?? 0));
   socket.on('error', () => process.exit(1));
-  send({ type: 'hello', proto: PROTO, instance, rid: 1 });
+  send({ type: 'hello', proto: PROTO, instance, ...(tunnel ? { fwd: tunnel.fwd } : fwd ? { fwd } : {}), rid: 1 });
   send({ type: 'attach', sid, outFrom: 0, evFrom: Number.MAX_SAFE_INTEGER, rid: 2 });
   send({ type: 'resize', sid, cols: cols(), rows: rows() });
   process.stdout.on('resize', () => send({ type: 'resize', sid, cols: cols(), rows: rows() }));
@@ -171,9 +205,14 @@ async function attach(sid: string, instance: string, size?: { cols: number; rows
   process.stdin.on('end', () => socket.end());
 }
 
-const [, , mode, sid, instance, cols, rows] = process.argv;
+const flag = (name: string): string | undefined => process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3);
+const [, , mode, sid, instance, cols, rows] = process.argv.filter((a) => !a.startsWith('--'));
+const fwd = flag('fwd');
+const upstream = flag('upstream');
+const mcpPort = Number(flag('mcp-port'));
+const tunnel: Tunnel | undefined = fwd && upstream && mcpPort > 0 && mcpPort < 65536 ? { fwd, upstream, port: mcpPort } : undefined;
 if (mode === 'rpc') void rpc();
-else if (mode === 'attach' && sid && instance) void attach(sid, instance, cols && rows ? { cols: Number(cols), rows: Number(rows) } : undefined);
+else if (mode === 'attach' && sid && instance) void attach(sid, instance, cols && rows ? { cols: Number(cols), rows: Number(rows) } : undefined, tunnel, tunnel ? undefined : fwd || undefined);
 else {
   process.stderr.write('client.js rpc | attach <sid> <instance> [cols rows]\n');
   process.exit(2);

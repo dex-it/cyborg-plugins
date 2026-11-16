@@ -185,7 +185,7 @@ describe('createSessionTools', () => {
 
   it('у завершённой сессии инструментов нет, вызов - ошибка', async () => {
     const { backend } = tools(null);
-    assert.deepEqual(backend.tools(1), []);
+    assert.deepEqual(await backend.tools(1), []);
     await assert.rejects(backend.call(1, 'list_sessions', {}), /завершена/);
   });
 });

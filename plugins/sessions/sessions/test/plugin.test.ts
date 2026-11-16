@@ -40,7 +40,7 @@ describe('плагин sessions', () => {
   });
 
   it('манифест: версия контракта, потребляемые контракты, закреплённый запуск и запрет всех шести опасных флагов', () => {
-    assert.deepEqual(manifest.provides, { 'cyborg.sessions': '1.2' });
+    assert.deepEqual(manifest.provides, { 'cyborg.sessions': '1.3' });
     assert.deepEqual(Object.keys(manifest.consumes).toSorted(), ['cyborg.agent', 'cyborg.agent-tool', 'cyborg.session-prompt']);
     assert.deepEqual(manifest.permissions['fs.read'], ['workspace'], 'рабочий каталог pty проверяется как чтение; сам плагин файлов не читает');
     assert.deepEqual(manifest.permissions['fs.write'], ['workspace'], 'нужен проверке ядра команды агента history.delete (guard fs.write); сам плагин файлов не пишет');

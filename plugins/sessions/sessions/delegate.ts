@@ -1,4 +1,5 @@
 import type { AgentEvent, AgentToolsEndpoint, PluginContext } from '@cyborg-harness/contracts';
+import type { RemoteSessionBinding } from '@cyborg-plugins/contracts';
 import { collectTools, readActions, type ToolSource } from './agent-tools.ts';
 import { installAssets } from './assets.generated.ts';
 import { ChildSessions } from './child-sessions.ts';
@@ -8,7 +9,7 @@ import type { Launcher, LauncherHooks } from './launcher.ts';
 import { MCP_PATH, mcpHandler, type McpBackend } from './mcp.ts';
 import type { Registry, Tab } from './registry.ts';
 import { Tokens } from './tokens.ts';
-import { createSessionTools, OWN_TOOLS, type HandoffRequest } from './tools.ts';
+import { createSessionTools, OWN_TOOLS, type HandoffRequest, type Limits, type RemoteToolsPort } from './tools.ts';
 
 // Делегирование дочерним сессиям (фича 15, M-04): MCP-сервер сессий, токены, инструменты, поручение вкладке, плагин Claude Code. Все точки подключения к главной части -
 // `hooks` (для launcher), `bind` (после создания launcher), `forget` (вкладку закрыл человек) и `registerCommands`.
@@ -20,8 +21,15 @@ export const SERVER_VERSION = '1.0.0';
 export const PARALLEL_SKILL = 'cyborg:parallel-sessions';
 export const PARALLEL_PROMPT = `Cyborg ведёт работу в параллельных сессиях - локальных и удалённых, на серверах по SSH. Задачу, которая распадается на независимые части, можно делегировать другим сессиям Cyborg: в первый раз спроси человека и запомни его решение; как делегировать, вести задачу совместно, распределять нагрузку и закрывать отработавших - скилл ${PARALLEL_SKILL}.`;
 
+/** Плагин-агент удалённых сессий: его `launch` ведёт `ssh` к демону на хосте (`remote-sessions`). */
+export const REMOTE_AGENT = 'remote-sessions';
+
+const sameDirs = (a: readonly string[], b: readonly string[]): boolean => a.length === b.length && [...a].sort().join('\0') === [...b].sort().join('\0');
+
 export interface Delegate {
   readonly hooks: LauncherHooks;
+  /** Удалённая сессия `sessionId` (id запуска) привязана к вкладке: токен демона принят вместо выданного, вкладка помечена удалённой. */
+  adoptRemote(sessionId: string, remote: RemoteSessionBinding): Promise<void>;
   /** Сессия закрыта человеком или плагином: токен отозван, очередь снята. */
   forget(sessionId: string): void;
   /** Launcher создаётся с `hooks`, а поручение вкладке открывает сессии им же: связь замыкается после создания. */
@@ -34,6 +42,8 @@ export interface Delegate {
 
 export function createDelegate(ctx: PluginContext, registry: Registry): Delegate {
   const tokens = new Tokens();
+  /** Сессии, чьи клоны на хосте уже убраны вызовом close_agent: закрытие их вкладки хост больше не трогает. */
+  const closedRemotely = new Set<string>();
   const children = new ChildSessions(`${ctx.os.paths.data}/child-sessions.json`, ctx.os.fs);
   let launcher: Launcher | undefined;
 
@@ -70,6 +80,33 @@ export function createDelegate(ctx: PluginContext, registry: Registry): Delegate
     revoke: (sessionId) => tokens.revoke(sessionId),
   });
 
+  // Удалённая часть - команды плагина remote-sessions (callers: plugins). Нет плагина или проекта - хостов нет, spawn_agent и close_agent не отдаются.
+  const projectIdOf = async (dirs: readonly string[]): Promise<string | undefined> => {
+    const projects = ctx.contracts.get('cyborg.projects', 1);
+    return (await projects?.list())?.find((p) => sameDirs(p.repos, dirs))?.id;
+  };
+  const remoteTools: RemoteToolsPort = {
+    async prepare(dirs, host, limits?: Limits) {
+      const project = await projectIdOf(dirs);
+      if (project === undefined) throw new Error('проект сессии не найден');
+      await ctx.commands.run('remote-sessions.prepare', project, host, limits ?? {});
+    },
+    async report(number) {
+      const found = delegation.remoteByNumber(number);
+      if (found) await ctx.commands.run('remote-sessions.report', found.remote.sid);
+    },
+    async close(number, keep) {
+      const found = delegation.remoteByNumber(number);
+      if (!found) throw new Error(`сессия ${String(number)} не удалённая`);
+      closedRemotely.add(found.sessionId);
+      const text = String(await ctx.commands.run('remote-sessions.close', found.remote.sid, keep));
+      // Сессия на хосте завершена, и `ssh` вкладки выходит вместе с ней: вкладку снимаем по id, номер к этому времени мог освободиться.
+      const tab = registry.get(found.sessionId);
+      if (tab) await closeTab(tab);
+      return text;
+    },
+  };
+
   // Поручение вкладке: ключ одноразовый и остаётся в плагине. Открывает вкладку сам плагин (документы его), поэтому ни ключ, ни промпт до вида не доходят.
   const handoffs = new Handoffs((request: HandoffRequest) => {
     if (!launcher) return false;
@@ -83,7 +120,16 @@ export function createDelegate(ctx: PluginContext, registry: Registry): Delegate
       const parent = delegation.sessionOf(request.from);
       const dirs = delegation.dirsOf(request.from);
       if (!launcher || parent === undefined || !dirs) throw new Error('сессия, поручившая работу, завершилась');
-      const opened = await launcher.open({ cwd: request.repo, addDirs: dirs.filter((d) => d !== request.repo), prompt: entry.prompt }, { parent });
+      const addDirs = dirs.filter((d) => d !== request.repo);
+      let opened;
+      if (entry.remote) {
+        // spawn_agent: клоны и демон на хосте готовит remote-sessions, вкладка подхватывает созданную сессию по её идентификатору (resumeId).
+        const project = await projectIdOf(dirs);
+        if (project === undefined) throw new Error('проект сессии не найден');
+        const { host, branch, keep, limits } = entry.remote;
+        const created = (await ctx.commands.run('remote-sessions.create-task', project, { host, repo: request.repo, branch, prompt: entry.prompt, keep, spawnedBy: request.from, ...(limits && { limits }) })) as { resumeId: string };
+        opened = await launcher.open({ cwd: request.repo, addDirs, agent: REMOTE_AGENT, resumeId: created.resumeId }, { parent });
+      } else opened = await launcher.open({ cwd: request.repo, addDirs, prompt: entry.prompt }, { parent });
       const number = delegation.numberOf(opened.sessionId);
       if (number === undefined) throw new Error('вкладка открыта, но уже закрыта');
       announce({ type: 'session:handoff', from: request.from, sessionId: opened.sessionId, number });
@@ -104,9 +150,18 @@ export function createDelegate(ctx: PluginContext, registry: Registry): Delegate
       say: (id, text) => delegation.say(id, text),
       isChild: (id) => delegation.isChild(id),
       reportLocal: (id, report) => delegation.reportLocal(id, report),
+      kindOf: (id) => delegation.kindOf(id),
+      hostsOf: async (dirs) => {
+        const project = await projectIdOf(dirs);
+        if (project === undefined) return [];
+        const hosts = await ctx.commands.run('remote-sessions.hosts', project);
+        return Array.isArray(hosts) ? hosts.filter((h): h is string => typeof h === 'string') : [];
+      },
     },
     handoffs,
     (id) => delegation.close(id),
+    undefined,
+    remoteTools,
   );
 
   // Инструменты поставщиков идут вслед за своими; своя сессия вызывает только то, что видит в tools/list.
@@ -182,10 +237,23 @@ export function createDelegate(ctx: PluginContext, registry: Registry): Delegate
     attach: (tab, lineage: Lineage, adopted) => void delegation.attach(tab, lineage, adopted),
     event: (tab: Tab, e: AgentEvent) => delegation.event(tab, e),
     ended: (sessionId) => delegation.forget(sessionId),
+    // Крестик вкладки (FR-17012): удалённая сессия завершается на хосте, клоны убираются; обрыв ssh сюда не приходит - вкладка остаётся в реестре.
+    closed: (sessionId) => {
+      const remote = delegation.remoteOf(sessionId);
+      if (!remote || closedRemotely.delete(sessionId)) return;
+      void Promise.resolve(ctx.commands.run('remote-sessions.close', remote.sid, false)).catch((error: unknown) => ctx.log(`удалённая сессия ${remote.sid.slice(0, 8)} на ${remote.host} не закрыта: ${String(error)}`, 'warn'));
+    },
   };
 
   return {
     hooks,
+    async adoptRemote(sessionId, remote) {
+      const sid = remote.sid;
+      if (typeof remote.host !== 'string' || remote.host === '' || typeof sid !== 'string' || typeof remote.token !== 'string') throw new Error('привязка удалённой сессии: нужны host, sid и token');
+      if (!/^[0-9a-f-]{8,64}$/.test(sid)) throw new Error('привязка удалённой сессии: sid не годится');
+      if (!tokens.adopt(sessionId, remote.token)) throw new Error('токен удалённой сессии не принят: у сессии нет выданного токена, токен не той формы или он чужой');
+      delegation.setRemote(sessionId, { host: remote.host, sid });
+    },
     forget: (sessionId) => delegation.forget(sessionId),
     bind: (l) => void (launcher = l),
     start: async () => void (await assets()),

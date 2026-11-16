@@ -66,6 +66,7 @@ function agentWith(ssh: Ssh, { host: given, service: extra = {}, ...deps }: Opts
     projectOf: async () => undefined,
     sshVersion: async () => 'OpenSSH_9.6p1, OpenSSL 3.0',
     env: async () => ({}),
+    adopt: async () => false,
     pollMs: 10,
     ...deps,
   });
