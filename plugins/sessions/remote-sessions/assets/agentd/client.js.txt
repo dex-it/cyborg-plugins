@@ -28,6 +28,75 @@ var import_node_fs = __toESM(require("node:fs"), 1);
 var import_node_net = __toESM(require("node:net"), 1);
 var import_node_os = __toESM(require("node:os"), 1);
 var import_node_path = __toESM(require("node:path"), 1);
+
+// companions/agentd/src/agentd/http-host.ts
+var HEAD_END = Buffer.from("\r\n\r\n");
+var MAX_HEAD = 64 * 1024;
+var HostRewriter = class {
+  host;
+  head = Buffer.alloc(0);
+  body = 0;
+  raw = false;
+  /** `host` - значение заголовка Host, которое ждёт сервер (`127.0.0.1:12345`). */
+  constructor(host) {
+    this.host = host;
+  }
+  /** Байты запроса от агента: отдаёт то, что надо передать серверу. */
+  push(chunk) {
+    if (this.raw) return chunk;
+    const out = [];
+    let rest = chunk;
+    while (rest.length > 0) {
+      if (this.body > 0) {
+        const take = Math.min(this.body, rest.length);
+        out.push(rest.subarray(0, take));
+        this.body -= take;
+        rest = rest.subarray(take);
+        continue;
+      }
+      this.head = Buffer.concat([this.head, rest]);
+      rest = Buffer.alloc(0);
+      const end = this.head.indexOf(HEAD_END);
+      if (end < 0) {
+        if (this.head.length > MAX_HEAD) {
+          out.push(this.head);
+          this.head = Buffer.alloc(0);
+          this.raw = true;
+        }
+        break;
+      }
+      const text = this.head.subarray(0, end).toString("latin1");
+      const after = this.head.subarray(end + HEAD_END.length);
+      this.head = Buffer.alloc(0);
+      const lines = text.split("\r\n");
+      let length = 0;
+      let chunked = false;
+      const fixed = lines.map((line, i) => {
+        if (i === 0) return line;
+        const name = /^([^:]+):/.exec(line)?.[1]?.trim().toLowerCase();
+        if (name === "host") return `Host: ${this.host}`;
+        if (name === "content-length") length = Number(line.slice(line.indexOf(":") + 1).trim()) || 0;
+        if (name === "transfer-encoding" && /chunked/i.test(line)) chunked = true;
+        if (name === "upgrade") chunked = true;
+        return line;
+      });
+      if (!fixed.some((l, i) => i > 0 && /^host:/i.test(l))) fixed.push(`Host: ${this.host}`);
+      out.push(Buffer.from(`${fixed.join("\r\n")}\r
+\r
+`, "latin1"));
+      if (chunked) {
+        this.raw = true;
+        out.push(after);
+        break;
+      }
+      this.body = length;
+      rest = after;
+    }
+    return Buffer.concat(out);
+  }
+};
+
+// companions/agentd/src/agentd/client.ts
 var PROTO = 2;
 var run = import_node_path.default.join(import_node_os.default.homedir(), ".cyborg", "run");
 var sock = import_node_path.default.join(run, "agentd.sock");
@@ -119,7 +188,28 @@ async function rpc() {
     finish();
   });
 }
-async function attach(sid2, instance2, size) {
+function listenTunnel(t) {
+  import_node_fs.default.rmSync(t.fwd, { force: true });
+  const server = import_node_net.default.createServer((client) => {
+    const up = import_node_net.default.connect(t.upstream);
+    const rewrite = new HostRewriter(`127.0.0.1:${String(t.port)}`);
+    client.on("data", (chunk) => up.write(rewrite.push(chunk)));
+    up.pipe(client);
+    client.on("error", () => up.destroy());
+    up.on("error", () => client.destroy());
+    client.on("close", () => up.destroy());
+    up.on("close", () => client.destroy());
+  });
+  server.listen(t.fwd, () => import_node_fs.default.chmodSync(t.fwd, 384));
+  const quit = () => {
+    server.close();
+    import_node_fs.default.rmSync(t.fwd, { force: true });
+  };
+  process.on("exit", quit);
+  return server;
+}
+async function attach(sid2, instance2, size, tunnel2, fwd2) {
+  if (tunnel2) await new Promise((resolve) => listenTunnel(tunnel2).once("listening", resolve));
   const socket = await connect();
   const send = (msg) => void socket.write(JSON.stringify(msg) + "\n");
   const cols2 = () => size?.cols ?? process.stdout.columns ?? 80;
@@ -166,7 +256,7 @@ async function attach(sid2, instance2, size) {
   }));
   socket.on("close", () => process.exit(exitCode ?? 0));
   socket.on("error", () => process.exit(1));
-  send({ type: "hello", proto: PROTO, instance: instance2, rid: 1 });
+  send({ type: "hello", proto: PROTO, instance: instance2, ...tunnel2 ? { fwd: tunnel2.fwd } : fwd2 ? { fwd: fwd2 } : {}, rid: 1 });
   send({ type: "attach", sid: sid2, outFrom: 0, evFrom: Number.MAX_SAFE_INTEGER, rid: 2 });
   send({ type: "resize", sid: sid2, cols: cols2(), rows: rows2() });
   process.stdout.on("resize", () => send({ type: "resize", sid: sid2, cols: cols2(), rows: rows2() }));
@@ -175,9 +265,14 @@ async function attach(sid2, instance2, size) {
   process.stdin.on("data", (data) => send({ type: "input", sid: sid2, data }));
   process.stdin.on("end", () => socket.end());
 }
-var [, , mode, sid, instance, cols, rows] = process.argv;
+var flag = (name) => process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3);
+var [, , mode, sid, instance, cols, rows] = process.argv.filter((a) => !a.startsWith("--"));
+var fwd = flag("fwd");
+var upstream = flag("upstream");
+var mcpPort = Number(flag("mcp-port"));
+var tunnel = fwd && upstream && mcpPort > 0 && mcpPort < 65536 ? { fwd, upstream, port: mcpPort } : void 0;
 if (mode === "rpc") void rpc();
-else if (mode === "attach" && sid && instance) void attach(sid, instance, cols && rows ? { cols: Number(cols), rows: Number(rows) } : void 0);
+else if (mode === "attach" && sid && instance) void attach(sid, instance, cols && rows ? { cols: Number(cols), rows: Number(rows) } : void 0, tunnel, tunnel ? void 0 : fwd || void 0);
 else {
   process.stderr.write("client.js rpc | attach <sid> <instance> [cols rows]\n");
   process.exit(2);

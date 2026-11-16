@@ -30,7 +30,7 @@ function serve(t: T, r: Rig): void {
 }
 
 /** Клиент в отдельном процессе с домашним каталогом стенда; stdout копится, stdin остаётся открытым. */
-function run(t: T, r: Rig, args: string[]) {
+function runClient(t: T, r: Rig, args: string[]) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cyborg-cl-'));
   const file = path.join(dir, 'client.js');
   fs.copyFileSync(CLIENT_JS, file);
@@ -68,7 +68,7 @@ describe('client.js rpc: пачка запросов одним вызовом',
   it('строки JSON со stdin уходят демону, ответы с rid печатаются строками, выход - когда ответили на всё', async (t) => {
     const r = mkRig(t);
     serve(t, r);
-    const cl = run(t, r, ['rpc']);
+    const cl = runClient(t, r, ['rpc']);
     cl.child.stdin.write('{"type":"hello","proto":2,"instance":"i1","rid":1}\n{"type":"list","rid":2}\n');
     cl.child.stdin.end();
     assert.equal(await cl.exit, 0, cl.out.err);
@@ -81,7 +81,7 @@ describe('client.js rpc: пачка запросов одним вызовом',
   it('ошибка демона приходит ответом error с тем же rid; запрос без rid и не-JSON пропускаются, не ломая остальное', async (t) => {
     const r = mkRig(t);
     serve(t, r);
-    const cl = run(t, r, ['rpc']);
+    const cl = runClient(t, r, ['rpc']);
     cl.child.stdin.write('не json\n\n{"type":"list"}\n{"type":"attach","sid":"нет","rid":7}\n');
     cl.child.stdin.end();
     assert.equal(await cl.exit, 0, cl.out.err);
@@ -94,7 +94,7 @@ describe('client.js rpc: пачка запросов одним вызовом',
     const r = mkRig(t);
     r.answers['ls-remote'] = { code: 2 };
     serve(t, r);
-    const cl = run(t, r, ['rpc']);
+    const cl = runClient(t, r, ['rpc']);
     cl.child.stdin.write(`{"type":"hello","proto":2,"instance":"i1","rid":1}\n${JSON.stringify(spawnMsg)}\n`);
     cl.child.stdin.end();
     assert.equal(await cl.exit, 0, cl.out.err);
@@ -114,7 +114,7 @@ describe('client.js attach: терминал сессии', () => {
     proc.emit('до подключения\r\n');
     // tty сессии записывает launch.sh под script; здесь - как будто записал.
     fs.writeFileSync(path.join(r.home, '.cyborg', 'sessions', SID, 'tty'), '/dev/pts/9');
-    const cl = run(t, r, ['attach', SID, 'inst-1', '100', '30']);
+    const cl = runClient(t, r, ['attach', SID, 'inst-1', '100', '30']);
     await until(() => cl.out.text.includes('до подключения'));
     proc.emit('живой вывод\r\n');
     await until(() => cl.out.text.includes('живой вывод'));
@@ -129,7 +129,7 @@ describe('client.js attach: терминал сессии', () => {
   it('сессии нет - сообщение в терминале и код 1; чужое окно - отказ демона тем же путём', async (t) => {
     const r = mkRig(t);
     serve(t, r);
-    const cl = run(t, r, ['attach', 'bbbbbbbb-1111-2222-3333-444444444444', 'inst-1']);
+    const cl = runClient(t, r, ['attach', 'bbbbbbbb-1111-2222-3333-444444444444', 'inst-1']);
     assert.equal(await cl.exit, 1);
     assert.match(cl.out.text, /\[сессия на хосте не найдена\]/);
   });
@@ -143,7 +143,7 @@ describe('client.js attach: терминал сессии', () => {
     const chunk = 'x'.repeat(64 * 1024);
     for (let i = 0; i < RING_BYTES / chunk.length + 4; i++) proc.emit(chunk);
     proc.emit('хвост');
-    const cl = run(t, r, ['attach', SID, 'inst-1', '80', '24']);
+    const cl = runClient(t, r, ['attach', SID, 'inst-1', '80', '24']);
     await until(() => cl.out.text.includes('хвост'));
     assert.ok(cl.out.text.startsWith('\x1bc\x1b[?1049h'), JSON.stringify(cl.out.text.slice(0, 20)));
     proc.exit(0);
@@ -152,8 +152,51 @@ describe('client.js attach: терминал сессии', () => {
 
   it('без аргументов клиент подсказывает вызов и выходит кодом 2', async (t) => {
     const r = mkRig(t);
-    const cl = run(t, r, ['attach']);
+    const cl = runClient(t, r, ['attach']);
     assert.equal(await cl.exit, 2);
     assert.match(cl.out.err, /client\.js rpc \| attach/);
+  });
+
+  it('туннель MCP: клиент слушает свой сокет (его демон берёт из hello.fwd), передаёт запросы на сокет ssh -R и подставляет Host сервера; ответ идёт обратно', async (t) => {
+    const r = mkRig(t);
+    r.answers['ls-remote'] = { code: 2 };
+    serve(t, r);
+    const proc = await live(r);
+    const runDir = path.join(r.home, '.cyborg', 'run');
+    const upstream = path.join(runDir, 'mcp-0123456789abcdef.sock');
+    const fwd = path.join(runDir, 'fwd-0123456789abcdef.sock');
+    const got: string[] = [];
+    const server = net.createServer((socket) => {
+      let text = '';
+      socket.on('data', (d) => {
+        text += d.toString('utf8');
+        if (text.includes('\r\n\r\n') && text.endsWith('{"x":1}')) {
+          got.push(text);
+          text = '';
+          socket.write('HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok');
+        }
+      });
+    });
+    await new Promise<void>((resolve) => server.listen(upstream, () => resolve()));
+    t.after(() => server.close());
+    const cl = runClient(t, r, ['attach', SID, 'inst-1', '80', '24', `--fwd=${fwd}`, `--upstream=${upstream}`, '--mcp-port=4321']);
+    await until(() => fs.existsSync(fwd));
+    assert.equal((fs.statSync(fwd).mode & 0o777).toString(8), '600');
+    const reply = await new Promise<string>((resolve, reject) => {
+      const socket = net.connect(fwd);
+      let out = '';
+      socket.on('data', (d) => (out += d.toString('utf8')));
+      socket.on('connect', () => socket.write('POST /mcp HTTP/1.1\r\nHost: 127.0.0.1:55555\r\nAuthorization: Bearer T\r\nContent-Length: 7\r\n\r\n{"x":1}'));
+      socket.on('error', reject);
+      setTimeout(() => (socket.destroy(), resolve(out)), 400);
+    });
+    assert.match(reply, /^HTTP\/1\.1 200 OK/);
+    assert.equal(got.length, 1);
+    assert.match(got[0] ?? '', /\r\nHost: 127\.0\.0\.1:4321\r\n/);
+    assert.doesNotMatch(got[0] ?? '', /55555/);
+    assert.ok(got[0]?.includes('Authorization: Bearer T'));
+    proc.exit(0);
+    await cl.exit;
+    assert.equal(fs.existsSync(fwd), false, 'сокет клиента убран с его выходом');
   });
 });

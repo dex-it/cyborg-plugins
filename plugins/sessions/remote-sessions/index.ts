@@ -1,5 +1,5 @@
-import type { PluginContext, PluginModule, Subscription } from '@cyborg-harness/contracts';
-import type { ProjectSettings, SettingsSection, SettingsValues } from '@cyborg-plugins/contracts';
+import type { PluginContext, PluginModule, Remote, Subscription } from '@cyborg-harness/contracts';
+import type { ProjectSettings, SessionsV13, SettingsSection, SettingsValues } from '@cyborg-plugins/contracts';
 import { makeAgent } from './agent.ts';
 import type { ProjectView } from './args.ts';
 import { collectGitAuth, type CliRunner } from './auth.ts';
@@ -45,6 +45,12 @@ const SECTION: SettingsSection = {
 };
 
 const KNOWN_MAX = 200;
+/** 32 случайных байта, base64url без заполнителя: 43 знака (форма токенов `sessions`). */
+function token43(): string {
+  let text = '';
+  for (const byte of crypto.getRandomValues(new Uint8Array(32))) text += String.fromCharCode(byte);
+  return btoa(text).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 
 const plugin: PluginModule = {
@@ -134,7 +140,7 @@ const plugin: PluginModule = {
       gitAuth: (urls) => collectGitAuth(urls, cli),
       claudeToken: () => tokenStore.get(),
       uuid: () => crypto.randomUUID(),
-      secret: () => [...crypto.getRandomValues(new Uint8Array(32))].map((b) => b.toString(16).padStart(2, '0')).join(''),
+      secret: token43,
     });
 
     // cyborg.agent: запуск ssh в pty потребителя.
@@ -149,6 +155,14 @@ const plugin: PluginModule = {
         return res ? `${res.stdout}\n${res.stderr}` : undefined;
       },
       env,
+      adopt: async (sessionId, binding) => {
+        // Поставщик 1.0 - 1.2 `adoptRemote` не даёт: потребитель проверяет, что член есть.
+        const sessions = ctx.contracts.get('cyborg.sessions', 1) as Remote<SessionsV13> | undefined;
+        if (typeof sessions?.adoptRemote !== 'function') return false;
+        await sessions.adoptRemote(sessionId, binding);
+        return true;
+      },
+      log: (message, level) => ctx.log(message, level),
     });
     ctx.subscriptions.add(ctx.contracts.provide('cyborg.agent', '1.0', agent));
 
@@ -180,6 +194,9 @@ const plugin: PluginModule = {
     const reg = (name: string, handler: (...args: unknown[]) => unknown): void => void ctx.subscriptions.add(ctx.commands.register(name, handler));
     reg('remote-sessions.create', (projectId, args) => service.create(projectId, args));
     reg('remote-sessions.create-task', (projectId, args) => service.createWithPrompt(projectId, args));
+    reg('remote-sessions.hosts', (projectId) => service.hosts(projectId));
+    reg('remote-sessions.prepare', (projectId, host, limits) => service.prepare(projectId, host, limits));
+    reg('remote-sessions.report', (resumeId) => service.report(resumeId));
     reg('remote-sessions.discover', (projectId) => service.discover(projectId));
     reg('remote-sessions.history', (projectId) => service.history(projectId));
     reg('remote-sessions.wake', (projectId, host, sid) => service.wake(projectId, host, sid));

@@ -4,7 +4,8 @@
 _fd=$(dirname "$0"); [ -f "$_fd/fake.env" ] && . "$_fd/fake.env"
 # Подставной ssh для удалённых сессий: «хост» - эта же машина. Разбирает вызовы вида, как их строит ai-cyborg (`src/main/remote/ssh.ts`):
 #   ssh -T -o BatchMode=yes ... [-R туннель] -- <алиас> <команда>
-# и исполняет команду локально `sh -c`, stdin и код выхода сквозные. Туннели (-R) принимаются и игнорируются.
+# и исполняет команду локально `sh -c`, stdin и код выхода сквозные. Туннель `-R <сокет>:<адрес>:<порт>` (unix-сокет на «хосте» -> TCP на этой машине) настоящий:
+# ssh-forward.mjs слушает сокет и гонит соединения на порт, пока жив процесс ssh (команда исполняется через exec, pid тот же). Другие формы -R игнорируются.
 # FAKE_SSH_LOG - журнал вызовов; FAKE_SSH_HOME - «домашний каталог хоста» (создаётся), чтобы установка в ~/.cyborg не трогала настоящий;
 # FAKE_SSH_FAIL=<алиас> - этот хост отказывает: «Permission denied», код 255 (как ssh без ключа).
 [ -n "$FAKE_SSH_LOG" ] && echo "$*" >> "$FAKE_SSH_LOG"
@@ -13,7 +14,8 @@ _fd=$(dirname "$0"); [ -f "$_fd/fake.env" ] && . "$_fd/fake.env"
 while [ $# -gt 0 ]; do
   case "$1" in
     --) shift; break;;
-    -o|-R|-L|-D|-i|-p|-F|-l|-J|-b|-c|-E|-e|-m|-O|-Q|-S|-w|-W) shift 2;;
+    -R) fwd_spec=$2; shift 2;;
+    -o|-L|-D|-i|-p|-F|-l|-J|-b|-c|-E|-e|-m|-O|-Q|-S|-w|-W) shift 2;;
     -*) shift;;
     *) break;;
   esac
@@ -30,6 +32,17 @@ if [ -n "$FAKE_SSH_HOME" ]; then
   export HOME
   # Настоящий ssh начинает в домашнем каталоге хоста: относительные пути удалённых команд (`sh .cyborg/agentd/...`) считаются от него.
   cd "$HOME" || exit 1
+fi
+if [ -n "$fwd_spec" ]; then
+  fwd_sock=${fwd_spec%%:*}
+  fwd_port=${fwd_spec##*:}
+  case "$fwd_spec" in
+    /*:127.0.0.1:*)
+      mkdir -p "$(dirname "$fwd_sock")"
+      node "$_fd/ssh-forward.mjs" "$fwd_sock" "$fwd_port" $$ &
+      _i=0
+      while [ ! -S "$fwd_sock" ] && [ "$_i" -lt 50 ]; do sleep 0.1; _i=$((_i + 1)); done;;
+  esac
 fi
 if [ $# -eq 0 ]; then exec sh; fi
 exec sh -c "$*"
