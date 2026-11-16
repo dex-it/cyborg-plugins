@@ -1,0 +1,184 @@
+"use strict";
+var __create = Object.create;
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
+
+// companions/agentd/src/agentd/client.ts
+var import_node_child_process = require("node:child_process");
+var import_node_fs = __toESM(require("node:fs"), 1);
+var import_node_net = __toESM(require("node:net"), 1);
+var import_node_os = __toESM(require("node:os"), 1);
+var import_node_path = __toESM(require("node:path"), 1);
+var PROTO = 2;
+var run = import_node_path.default.join(import_node_os.default.homedir(), ".cyborg", "run");
+var sock = import_node_path.default.join(run, "agentd.sock");
+var RPC_TIMEOUT_MS = 25e3;
+function lineReader(onLine) {
+  let parts = [];
+  return (chunk) => {
+    let start = 0;
+    let nl;
+    while ((nl = chunk.indexOf(10, start)) >= 0) {
+      parts.push(chunk.subarray(start, nl));
+      const line = Buffer.concat(parts).toString("utf8");
+      parts = [];
+      start = nl + 1;
+      onLine(line);
+    }
+    if (start < chunk.length) parts.push(chunk.subarray(start));
+  };
+}
+function dial() {
+  return new Promise((resolve) => {
+    const socket = import_node_net.default.connect(sock);
+    socket.once("connect", () => resolve(socket));
+    socket.once("error", () => resolve(null));
+  });
+}
+async function connect() {
+  let socket = await dial();
+  if (!socket) {
+    import_node_fs.default.mkdirSync(run, { recursive: true, mode: 448 });
+    (0, import_node_child_process.spawn)(process.execPath, [import_node_path.default.join(__dirname, "agentd.js"), "serve"], { detached: true, stdio: "ignore" }).unref();
+    for (let i = 0; i < 50 && !socket; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      socket = await dial();
+    }
+  }
+  if (!socket) {
+    process.stderr.write("\u0430\u0433\u0435\u043D\u0442 Cyborg \u043D\u0430 \u0445\u043E\u0441\u0442\u0435 \u043D\u0435 \u0437\u0430\u043F\u0443\u0441\u0442\u0438\u043B\u0441\u044F\n");
+    process.exit(1);
+  }
+  return socket;
+}
+async function rpc() {
+  const socket = await connect();
+  const waiting = /* @__PURE__ */ new Set();
+  let inputDone = false;
+  let code = 0;
+  const finish = () => {
+    if (inputDone && waiting.size === 0) {
+      socket.end();
+      setImmediate(() => process.exit(code));
+    }
+  };
+  const timer = setTimeout(() => {
+    process.stderr.write(`\u0434\u0435\u043C\u043E\u043D \u043D\u0435 \u043E\u0442\u0432\u0435\u0442\u0438\u043B \u0437\u0430 ${RPC_TIMEOUT_MS / 1e3} \u0441
+`);
+    code = 1;
+    waiting.clear();
+    inputDone = true;
+    finish();
+  }, RPC_TIMEOUT_MS);
+  timer.unref();
+  socket.on("data", lineReader((line) => {
+    let msg;
+    try {
+      msg = JSON.parse(line);
+    } catch {
+      return;
+    }
+    if (typeof msg.rid !== "number") return;
+    process.stdout.write(line + "\n");
+    waiting.delete(msg.rid);
+    finish();
+  }));
+  socket.on("close", () => process.exit(code || (waiting.size ? 1 : 0)));
+  socket.on("error", () => process.exit(1));
+  process.stdin.on("data", lineReader((line) => {
+    if (!line.trim()) return;
+    try {
+      const msg = JSON.parse(line);
+      if (typeof msg.rid === "number") waiting.add(msg.rid);
+    } catch {
+      return;
+    }
+    socket.write(line + "\n");
+  }));
+  process.stdin.on("end", () => {
+    inputDone = true;
+    finish();
+  });
+}
+async function attach(sid2, instance2, size) {
+  const socket = await connect();
+  const send = (msg) => void socket.write(JSON.stringify(msg) + "\n");
+  const cols2 = () => size?.cols ?? process.stdout.columns ?? 80;
+  const rows2 = () => size?.rows ?? process.stdout.rows ?? 24;
+  let exitCode;
+  socket.on("data", lineReader((line) => {
+    let msg;
+    try {
+      msg = JSON.parse(line);
+    } catch {
+      return;
+    }
+    if (msg.sid !== void 0 && msg.sid !== sid2) return;
+    switch (msg.type) {
+      case "data":
+        process.stdout.write(String(msg.data ?? ""));
+        return;
+      // Вытесненное из кольца: терминал сбрасывается и получает режимы, которые claude включил один раз (alt-экран, мышь).
+      case "reset":
+        process.stdout.write("\x1Bc" + String(msg.modes ?? ""));
+        return;
+      case "exit":
+        exitCode = Number(msg.code) || 0;
+        process.stdout.write(`\r
+[\u0441\u0435\u0441\u0441\u0438\u044F \u043D\u0430 \u0445\u043E\u0441\u0442\u0435 \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u0430, \u043A\u043E\u0434 ${String(exitCode)}${typeof msg.reason === "string" && msg.reason ? `: ${msg.reason}` : ""}]\r
+`);
+        socket.end();
+        return;
+      case "ended":
+        send({ type: "ack", sid: sid2 });
+        return;
+      case "slept":
+        process.stdout.write("\r\n[\u0441\u0435\u0441\u0441\u0438\u044F \u043D\u0430 \u0445\u043E\u0441\u0442\u0435 \u0441\u043F\u0438\u0442: \u043E\u0442\u043A\u0440\u043E\u0439\u0442\u0435 \u0435\u0451 \u0438\u0437 \xAB\u0418\u0441\u0442\u043E\u0440\u0438\u0438\xBB]\r\n");
+        exitCode = 0;
+        socket.end();
+        return;
+      case "error":
+        process.stdout.write(`\r
+[${String(msg.message ?? "\u043E\u0448\u0438\u0431\u043A\u0430 \u0434\u0435\u043C\u043E\u043D\u0430")}]\r
+`);
+        exitCode = 1;
+        socket.end();
+    }
+  }));
+  socket.on("close", () => process.exit(exitCode ?? 0));
+  socket.on("error", () => process.exit(1));
+  send({ type: "hello", proto: PROTO, instance: instance2, rid: 1 });
+  send({ type: "attach", sid: sid2, outFrom: 0, evFrom: Number.MAX_SAFE_INTEGER, rid: 2 });
+  send({ type: "resize", sid: sid2, cols: cols2(), rows: rows2() });
+  process.stdout.on("resize", () => send({ type: "resize", sid: sid2, cols: cols2(), rows: rows2() }));
+  if (process.stdin.isTTY) process.stdin.setRawMode(true);
+  process.stdin.setEncoding("utf8");
+  process.stdin.on("data", (data) => send({ type: "input", sid: sid2, data }));
+  process.stdin.on("end", () => socket.end());
+}
+var [, , mode, sid, instance, cols, rows] = process.argv;
+if (mode === "rpc") void rpc();
+else if (mode === "attach" && sid && instance) void attach(sid, instance, cols && rows ? { cols: Number(cols), rows: Number(rows) } : void 0);
+else {
+  process.stderr.write("client.js rpc | attach <sid> <instance> [cols rows]\n");
+  process.exit(2);
+}

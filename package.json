@@ -19,11 +19,13 @@
     "contracts:gap": "node scripts/contracts.ts",
     "parity": "node scripts/parity.ts",
     "embed-assets": "node scripts/embed-assets.ts",
+    "build:companions": "node companions/agentd/scripts/build.mjs",
     "sync-labels": "node scripts/sync-labels.ts",
     "docs:catalog": "node scripts/gen-catalog.ts"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",
+    "esbuild": "^0.28.2",
     "typescript": "^7.0.2"
   },
   "workspaces": [
