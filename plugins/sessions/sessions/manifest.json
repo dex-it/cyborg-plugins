@@ -27,6 +27,11 @@
         "args": ["-lc", "exec claude --settings \"$CYBORG_SETTINGS\" \"$@\"", "cyborg"],
         "env": ["CYBORG_EVENTS", "CYBORG_SETTINGS", "CYBORG_MCP_TOKEN"],
         "deny": ["--dangerously-skip-permissions", "--permission-mode", "--allowedTools", "--allowed-tools", "--disallowedTools", "--tools"]
+      },
+      {
+        "program": "ssh",
+        "args": ["-tt", "-o", "BatchMode=yes", "-o", "ConnectTimeout=15", "-o", "ServerAliveInterval=15", "-o", "ServerAliveCountMax=3", "-o", "ExitOnForwardFailure=yes", "--"],
+        "env": ["SSH_AUTH_SOCK"]
       }
     ]
   }
