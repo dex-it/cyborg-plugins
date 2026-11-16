@@ -10,7 +10,8 @@
     "cyborg.project-settings": "1.0"
   },
   "optional": {
-    "cyborg.projects": "^1"
+    "cyborg.projects": "^1",
+    "cyborg.sessions": "^1.3"
   },
   "commands": {
     "remote-sessions.create": {
@@ -97,7 +98,27 @@
         "string"
       ]
     },
-    "remote-sessions.claude-token.clear": {}
+    "remote-sessions.claude-token.clear": {},
+    "remote-sessions.hosts": {
+      "args": [
+        "string"
+      ],
+      "callers": "plugins"
+    },
+    "remote-sessions.prepare": {
+      "args": [
+        "string",
+        "string",
+        "record"
+      ],
+      "callers": "plugins"
+    },
+    "remote-sessions.report": {
+      "args": [
+        "string"
+      ],
+      "callers": "plugins"
+    }
   },
   "permissions": {
     "process": [
@@ -169,6 +190,26 @@
           "-o",
           "ExitOnForwardFailure=yes",
           "--"
+        ],
+        "env": [
+          "SSH_AUTH_SOCK"
+        ]
+      },
+      {
+        "program": "ssh",
+        "args": [
+          "-tt",
+          "-o",
+          "BatchMode=yes",
+          "-o",
+          "ConnectTimeout=15",
+          "-o",
+          "ServerAliveInterval=15",
+          "-o",
+          "ServerAliveCountMax=3",
+          "-o",
+          "ExitOnForwardFailure=yes",
+          "-R"
         ],
         "env": [
           "SSH_AUTH_SOCK"

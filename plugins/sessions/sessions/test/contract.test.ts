@@ -1,4 +1,4 @@
-// Контракт cyborg.sessions 1.2 глазами чужого плагина (`probe`): члены ядра (onChange, reveal) и члены расширения (create, send, paste, метки, find, uses).
+// Контракт cyborg.sessions 1.3 глазами чужого плагина (`probe`): члены ядра (onChange, reveal) и члены расширения (create, send, paste, метки, find, uses).
 import assert from 'node:assert/strict';
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -10,13 +10,13 @@ const task = (key: string, title = 'Дерево файлов') => ({ key, title
 
 const needs = (id: string, range: string): InlinePlugin => ({ manifest: { id, version: '1.0.0', engines: { cyborg: '^1' }, requires: { 'cyborg.sessions': range } }, module: { activate: () => undefined } });
 
-test('поставщик отдаёт версию 1.2 и все члены каталога контрактов', async () => {
-  await using r = await rig({ extra: [needs('needs-12', '^1.2'), needs('needs-13', '^1.3')] });
-  // Версия: потребитель, которому нужна 1.2, получает поставщика; которому нужна 1.3, - нет.
-  assert.ok(r.kernel.active.includes('needs-12'));
-  assert.ok(!r.kernel.active.includes('needs-13'));
-  assert.deepEqual(r.kernel.journal.filter((e) => e.kind === 'rejected').map((e) => e.pluginId), ['needs-13'], 'отвергнут только тот, кому нужна 1.3');
-  for (const member of ['onChange', 'reveal', 'create', 'send', 'paste', 'labels', 'setLabels', 'find', 'uses']) {
+test('поставщик отдаёт версию 1.3 и все члены каталога контрактов', async () => {
+  await using r = await rig({ extra: [needs('needs-13', '^1.3'), needs('needs-14', '^1.4')] });
+  // Версия: потребитель, которому нужна 1.3, получает поставщика; которому нужна 1.4, - нет.
+  assert.ok(r.kernel.active.includes('needs-13'));
+  assert.ok(!r.kernel.active.includes('needs-14'));
+  assert.deepEqual(r.kernel.journal.filter((e) => e.kind === 'rejected').map((e) => e.pluginId), ['needs-14'], 'отвергнут только тот, кому нужна 1.4');
+  for (const member of ['onChange', 'reveal', 'create', 'send', 'paste', 'labels', 'setLabels', 'find', 'uses', 'adoptRemote']) {
     assert.equal(typeof (r.sessions as unknown as Record<string, unknown>)[member], 'function', member);
   }
 });

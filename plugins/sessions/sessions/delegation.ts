@@ -4,7 +4,7 @@ import { SUBMIT_DELAY_MS } from './input.ts';
 import type { ChildSessions } from './child-sessions.ts';
 import type { Registry, Tab } from './registry.ts';
 import { REPORT_ACCEPTED, REPORTED_ERROR, reportNote, reportText } from './report.ts';
-import type { PeerInfo, ReportArgs, SayResult, SessionState } from './tools.ts';
+import type { PeerInfo, ReportArgs, SayResult, SessionKind, SessionState } from './tools.ts';
 
 // Сведения о сессиях, нужные инструментам делегирования: номер `CC<n>`, состояние по событиям агента (FR-15005), очередь сообщений работающей вкладке (FR-15008),
 // родитель и «семья», итог дочерней (FR-15010). Перенос части src/main/sessions.ts и session-state.ts ai-cyborg. Состояние только в памяти плагина;
@@ -70,8 +70,15 @@ const numberInTitle = (title: string): number | undefined => {
   return digits === undefined ? undefined : Number(digits);
 };
 
+/** Удалённая сессия за вкладкой: хост и идентификатор на нём (привязывает remote-sessions). */
+export interface RemoteInfo {
+  readonly host: string;
+  readonly sid: string;
+}
+
 export class Delegation {
   private readonly metas = new Map<string, Meta>();
+  private readonly remotes = new Map<string, RemoteInfo>();
   private readonly deps: DelegationDeps;
   private readonly quietMs: number;
 
@@ -129,7 +136,28 @@ export class Delegation {
     const meta = this.metas.get(sessionId);
     if (meta) this.stop(meta);
     this.metas.delete(sessionId);
+    this.remotes.delete(sessionId);
     this.deps.revoke(sessionId);
+  }
+
+  /** Вкладка - удалённая сессия: набор инструментов, хост в list_sessions, итог с хостом. Привязка живёт до `forget`. */
+  setRemote(sessionId: string, remote: RemoteInfo): void {
+    this.remotes.set(sessionId, remote);
+  }
+
+  remoteOf(sessionId: string): RemoteInfo | undefined {
+    return this.remotes.get(sessionId);
+  }
+
+  /** Удалённая сессия по номеру вкладки. */
+  remoteByNumber(number: number): { sessionId: string; remote: RemoteInfo } | undefined {
+    const sessionId = this.sessionOf(number);
+    const remote = sessionId === undefined ? undefined : this.remotes.get(sessionId);
+    return sessionId === undefined || remote === undefined ? undefined : { sessionId, remote };
+  }
+
+  kindOf(number: number): SessionKind {
+    return this.remoteByNumber(number) ? 'remote' : 'local';
   }
 
   numberOf(sessionId: string): number | undefined {
@@ -188,6 +216,7 @@ export class Delegation {
         ...(m.reason !== undefined && { reason: m.reason }),
         ...(m.lastAnswer !== undefined && { lastAnswer: m.lastAnswer }),
         queued: m.outbox.length,
+        ...(this.remotes.has(m.sessionId) && { host: this.remotes.get(m.sessionId)?.host ?? '' }),
         ...(m.lineage.parentNumber !== undefined && { parent: m.lineage.parentNumber }),
       }));
   }
@@ -321,10 +350,13 @@ export class Delegation {
    */
   reportLocal(number: number, report: ReportArgs): string {
     const meta = this.byNumber(number);
-    if (!meta || meta.lineage.parent === undefined) throw new Error('report_done есть только у сессии, открытой другой сессией');
+    const remote = meta === undefined ? undefined : this.remotes.get(meta.sessionId);
+    // У удалённой сессии итог есть и без открывшей: тогда он показывается человеку уведомлением, как в ai-cyborg.
+    if (!meta || (meta.lineage.parent === undefined && remote === undefined)) throw new Error('report_done есть только у сессии, открытой другой сессией');
     if (meta.reported) throw new Error(REPORTED_ERROR);
     meta.reported = true;
-    if (!this.enqueue(meta.lineage.parent, reportText(number, undefined, report))) this.deps.notify(`CC${String(number)}`, reportNote(report));
+    const text = reportText(number, remote?.host, report);
+    if (meta.lineage.parent === undefined || !this.enqueue(meta.lineage.parent, text)) this.deps.notify(remote ? `CC${String(number)} · ${remote.host}` : `CC${String(number)}`, reportNote(report));
     return REPORT_ACCEPTED;
   }
 

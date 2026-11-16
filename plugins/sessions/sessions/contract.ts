@@ -5,8 +5,8 @@ import type { Input } from './input.ts';
 import type { Launcher } from './launcher.ts';
 import type { Registry } from './registry.ts';
 
-/** Версия контракта: 1.1 - `onChange`, `reveal`; 1.2 добавляет `create`, `send`, `paste`, метки (`labels`, `setLabels`, `find`) и `uses`. */
-export const CONTRACT_VERSION = '1.2';
+/** Версия контракта: 1.1 - `onChange`, `reveal`; 1.2 добавляет `create`, `send`, `paste`, метки (`labels`, `setLabels`, `find`) и `uses`; 1.3 - `adoptRemote` (M-05). */
+export const CONTRACT_VERSION = '1.3';
 
 /** Что приходит от чужого плагина, проверяется: типы через границу плагинов не гарантированы. */
 export function createContract(ctx: PluginContext, registry: Registry, launcher: Launcher, input: Input): SessionsV12 {

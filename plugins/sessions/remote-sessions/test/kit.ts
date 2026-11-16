@@ -2,12 +2,14 @@ import assert from 'node:assert/strict';
 import { chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import type { Agent, PluginContext, Provider, Remote } from '@cyborg-harness/contracts';
-import { memoryStore, startKernel, type InlinePlugin, type MemoryStore, type TestKernel } from '@cyborg-harness/testing';
+import { memoryStore, startKernel, type FakePty, type InlinePlugin, type MemoryStore, type TestKernel } from '@cyborg-harness/testing';
 import { fixtureRepo, toolbox, type FixtureRepo, type Toolbox } from '@cyborg-plugins/fixtures';
 import { ASSETS } from '../assets.generated.ts';
 import { bundleOf, type AgentdBundle } from '../install.ts';
 
 export const PLUGIN_DIR = path.resolve(import.meta.dirname, '..');
+export const SESSIONS_DIR = path.resolve(PLUGIN_DIR, '..', 'sessions');
+export const AGENT_DIR = path.resolve(PLUGIN_DIR, '..', '..', 'agents', 'agent-claude-code');
 export const manifest = JSON.parse(readFileSync(path.join(PLUGIN_DIR, 'manifest.json'), 'utf8')) as {
   permissions: { launch: { program: string; args: string[] }[]; process: { program: string; args: string[]; env?: string[] }[] };
   commands: Record<string, { args?: string[]; callers?: string }>;
@@ -38,8 +40,9 @@ export interface RigOptions {
   /** Нужны ли репозитории проекта: настоящие git-репозитории, origin второго указывает на первый. */
   repos?: boolean;
   env?: Record<string, string>;
-  /** Период опроса событий, мс. */
   extraPlugins?: InlinePlugin[];
+  /** Рядом настоящие `sessions` и `agent-claude-code` (локальная сессия-руководитель и сервер MCP): сценарии туннеля и инструментов. */
+  withSessions?: boolean;
 }
 
 export interface Rig extends AsyncDisposable {
@@ -50,6 +53,8 @@ export interface Rig extends AsyncDisposable {
   readonly agent: Remote<Agent>;
   readonly consumer: PluginContext;
   readonly config: MemoryStore;
+  /** Поддельный pty ядра: сессии `sessions` запускаются в нём. */
+  readonly pty: FakePty;
   readonly state: MemoryStore;
   /** Репозитории проекта: `origin` указывает на `server`. */
   readonly repos: { work: FixtureRepo; server: FixtureRepo } | undefined;
@@ -100,7 +105,18 @@ export async function rig(options: RigOptions = {}): Promise<Rig> {
   const shim = mkdtempSync('/tmp/cyu-');
   writeFileSync(path.join(shim, 'uname'), '#!/bin/sh\necho Linux\n');
   // Подставной `script` из util-linux (`script -qfec <команда> /dev/null`): на macOS у script другие ключи, а демон зовёт его как на Linux.
-  writeFileSync(path.join(shim, 'script'), '#!/bin/sh\nwhile [ $# -gt 0 ]; do case "$1" in -*c*) shift; exec sh -c "$1";; *) shift;; esac; done\n');
+  writeFileSync(
+    path.join(shim, 'script'),
+    [
+      '#!/bin/sh',
+      '# Как pty: перевод строки из Enter (\\r) становится \\n, иначе построчное чтение подставного claude его не увидит (node, а не tr: tr на macOS буферизует вывод).',
+      'while [ $# -gt 0 ]; do case "$1" in',
+      `  -*c*) shift; node -e 'process.stdin.on("data", (d) => process.stdout.write(String(d).replace(/\\r/g, "\\n")))' | sh -c "$1"; exit $?;;`,
+      '  *) shift;;',
+      'esac; done',
+      '',
+    ].join('\n'),
+  );
   for (const name of ['uname', 'script']) chmodSync(path.join(shim, name), 0o755);
   const box = toolbox({ env: { FAKE_SSH_HOME: sshHome }, ...(options.sshFail !== undefined && { sshFail: options.sshFail }) });
   mkdirSync(sshHome, { recursive: true });
@@ -155,7 +171,7 @@ export async function rig(options: RigOptions = {}): Promise<Rig> {
     rmSync(shim, { recursive: true, force: true });
   };
   const kernel = await startKernel({
-    plugins: [PLUGIN_DIR, projects, probe, ...(options.extraPlugins ?? [])],
+    plugins: [PLUGIN_DIR, projects, probe, ...(options.withSessions ? [SESSIONS_DIR, AGENT_DIR] : []), ...(options.extraPlugins ?? [])],
     config: config.store,
     state: state.store,
     os: { env: { PATH, HOME: process.env.HOME ?? sshHome, SHELL: path.join(box.bin, 'shell'), ...options.env } },
@@ -184,6 +200,7 @@ export async function rig(options: RigOptions = {}): Promise<Rig> {
     sshHome,
     agent: entry.impl,
     consumer: ctx,
+    pty: kernel.pty,
     config,
     state,
     repos,

@@ -23,6 +23,13 @@ export interface RepoSpec {
   name: string;
 }
 
+/** Пределы сессии для демона (`SpawnMsg.limits`). */
+export interface Limits {
+  maxPerHost: number;
+  taskMs: number;
+  idleMs: number;
+}
+
 export interface CleanupResult {
   removed: string[];
   kept: { path: string; reason: string }[];

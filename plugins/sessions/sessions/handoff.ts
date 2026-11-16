@@ -1,4 +1,4 @@
-import { HANDOFF_TIMEOUT_MS, type HandoffRequest } from './tools.ts';
+import { HANDOFF_TIMEOUT_MS, type HandoffRequest, type RemoteHandoff } from './tools.ts';
 
 // Задача, переданная сессией в новую вкладку (ADR-0019 ai-cyborg, п. 4): вкладку открывают по одноразовому ключу, а промпт хранит плагин
 // и отдаёт его только тому, кто назвал ключ и каталог. Перенос `Handoffs` из src/main/session-tools.ts.
@@ -9,13 +9,15 @@ import { HANDOFF_TIMEOUT_MS, type HandoffRequest } from './tools.ts';
 
 interface Pending extends HandoffRequest {
   prompt: string;
+  /** Есть у spawn_agent: вкладка удалённая, её открывает remote-sessions. */
+  remote?: RemoteHandoff;
   resolve: (id: number) => void;
   reject: (error: Error) => void;
   timer: ReturnType<typeof setTimeout>;
 }
 
 /** Что отдаёт `take`: промпт и способ сообщить вызвавшей модели итог открытия. */
-export type Taken = Pick<Pending, 'prompt' | 'from' | 'resolve' | 'reject'>;
+export type Taken = Pick<Pending, 'prompt' | 'remote' | 'from' | 'resolve' | 'reject'>;
 
 export class Handoffs {
   private readonly pending = new Map<string, Pending>();
@@ -29,12 +31,12 @@ export class Handoffs {
   }
 
   /** Номер новой сессии, когда вкладка открыта. */
-  request(from: number, repo: string, prompt: string): Promise<number> {
+  request(from: number, repo: string, prompt: string, remote?: RemoteHandoff): Promise<number> {
     const hid = crypto.randomUUID();
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => this.fail(hid, `вкладка не открыта за ${String(this.timeoutMs / 1000)} с`), this.timeoutMs);
-      this.pending.set(hid, { hid, from, repo, prompt, resolve, reject, timer });
-      if (!this.send({ hid, from, repo })) this.fail(hid, 'открыть вкладку некому');
+      this.pending.set(hid, { hid, from, repo, prompt, ...(remote && { remote }), resolve, reject, timer });
+      if (!this.send({ hid, from, repo, ...(remote && { host: remote.host }) })) this.fail(hid, 'открыть вкладку некому');
     });
   }
 

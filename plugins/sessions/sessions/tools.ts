@@ -3,16 +3,20 @@ import type { McpBackend, McpTool } from './mcp.ts';
 
 // Инструменты сессий для агента по MCP (фича 15): open_session, list_sessions, send_to_session, close_session и report_done у дочерней.
 // Перенос src/main/session-tools.ts ai-cyborg. Номера сессий у инструментов - целые (`CC<n>`), как в ai-cyborg: модель видит их в list_sessions;
-// плагин сопоставляет номер с id сессии (delegation.ts). Удалённые сессии (spawn_agent, close_agent, хосты) - задача M-05, здесь их нет.
+// плагин сопоставляет номер с id сессии (delegation.ts). Удалённые агенты (фича 17, M-05): spawn_agent и close_agent у локальной сессии проекта с хостами,
+// у удалённой сессии - только список, сообщение и итог (open_session и close_session ей не отдаются: удалённый агент не должен открывать сессии на этой машине).
+// Саму работу с хостом ведёт плагин remote-sessions (`RemoteToolsPort`).
 
 export const OPEN_SESSION_TOOL = 'open_session';
 export const LIST_SESSIONS_TOOL = 'list_sessions';
 export const SEND_TO_SESSION_TOOL = 'send_to_session';
 export const CLOSE_SESSION_TOOL = 'close_session';
 export const REPORT_DONE_TOOL = 'report_done';
+export const SPAWN_AGENT_TOOL = 'spawn_agent';
+export const CLOSE_AGENT_TOOL = 'close_agent';
 
 /** Имена своих инструментов: чужой поставщик `cyborg.agent-tool` их не перекроет. */
-export const OWN_TOOLS: readonly string[] = [OPEN_SESSION_TOOL, LIST_SESSIONS_TOOL, SEND_TO_SESSION_TOOL, CLOSE_SESSION_TOOL, REPORT_DONE_TOOL];
+export const OWN_TOOLS: readonly string[] = [OPEN_SESSION_TOOL, LIST_SESSIONS_TOOL, SEND_TO_SESSION_TOOL, CLOSE_SESSION_TOOL, REPORT_DONE_TOOL, SPAWN_AGENT_TOOL, CLOSE_AGENT_TOOL];
 
 export type SessionState = 'starting' | 'working' | 'waiting' | 'asking';
 
@@ -35,9 +39,15 @@ export interface PeerInfo {
 
 export type SayResult = 'sent' | 'queued';
 
+export type SessionKind = 'local' | 'remote';
+
 export interface ToolContext {
   /** Вызывающую открыла другая сессия: локальной дочерней отдаётся report_done. */
   child?: boolean;
+  /** Вызывающая идёт на SSH-хосте: у неё свой набор инструментов. */
+  kind?: SessionKind;
+  /** Хосты проекта вызывающей: без них spawn_agent и close_agent не отдаются. */
+  hosts?: readonly string[];
 }
 
 /** Промпт новой сессии уходит позиционным аргументом claude, а Linux ограничивает один аргумент 128 КиБ (MAX_ARG_STRLEN). */
@@ -77,15 +87,71 @@ export function branchNameProblem(name: unknown): string | null {
 /** Каталоги вызывающей сессии - перечень в схеме: модель видит, из чего выбирать активный каталог новой. */
 export function sessionTools(dirs: readonly string[], context: ToolContext = {}): McpTool[] {
   const all = localTools(dirs);
-  return context.child ? [...all, reportDoneTool()] : all;
+  const byName = (...names: string[]): McpTool[] => all.filter((t) => names.includes(t.name));
+  if (context.kind === 'remote') return [...byName(LIST_SESSIONS_TOOL, SEND_TO_SESSION_TOOL), reportDoneTool('remote')];
+  const local = context.child ? [...all, reportDoneTool('local')] : all;
+  return context.hosts?.length ? [...local, spawnAgentTool(dirs, context.hosts), closeAgentTool()] : local;
 }
 
-function reportDoneTool(): McpTool {
+function spawnAgentTool(dirs: readonly string[], hosts: readonly string[]): McpTool {
+  return {
+    name: SPAWN_AGENT_TOOL,
+    description:
+      'Запускает агента - сессию Claude Code на сервере разработчика по SSH - и отправляет ему prompt первым сообщением. ' +
+      'На хосте у агента свои клоны origin всех репозиториев проекта: repo - рабочий и стоит на ветке branch (нет такой ветки в origin - создаётся от ветки по умолчанию), ' +
+      'остальные подключены как дополнительные и остаются на ветке по умолчанию origin. Вкладка открывается в фоне, возвращается её номер. ' +
+      'Агент этого диалога не видит: prompt - самодостаточное задание. Закончив, агент вызывает report_done, и его итог приходит тебе сообщением; ' +
+      'после итога агент остаётся открытым: send_to_session продолжает его работу новым кругом, close_agent завершает и убирает клоны. ' +
+      'Агент, 2 ч ждущий ввода, засыпает: вкладка закрывается, клоны и разговор остаются на хосте, и человек может продолжить его из «Истории». ' +
+      'Лимиты по умолчанию: 4 агента на хост, 4 ч на круг работы, 30 мин простоя в работе; превышение закрывает агента с итогом failed. Вызов подтверждает человек.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        host: { type: 'string', enum: [...hosts], description: 'Алиас хоста из ~/.ssh/config, заданный в проекте.' },
+        repo: { type: 'string', enum: [...dirs], description: 'Рабочий репозиторий агента - один из каталогов проекта.' },
+        branch: { type: 'string', description: 'Ветка, на которой агент работает; не начинается с «-».' },
+        prompt: { type: 'string', minLength: 1, description: 'Первое сообщение агента: задание целиком. Не начинается с «-».' },
+        limits: {
+          type: 'object',
+          properties: {
+            max_agents_per_host: { type: 'integer', minimum: 1, maximum: 16 },
+            task_timeout_min: { type: 'integer', minimum: 1, maximum: 1440 },
+            idle_timeout_min: { type: 'integer', minimum: 1, maximum: 1440 },
+          },
+          additionalProperties: false,
+        },
+        keep: { type: 'boolean', description: 'Не удалять клоны, если сессия завершится сама, без close_agent.' },
+      },
+      required: ['host', 'repo', 'branch', 'prompt'],
+      additionalProperties: false,
+    },
+  };
+}
+
+function closeAgentTool(): McpTool {
+  return {
+    name: CLOSE_AGENT_TOOL,
+    description:
+      'Завершает удалённого агента (вкладку проекта) в любом состоянии и удаляет его клоны на хосте. ' +
+      'Клон с незапушенными коммитами, изменениями, stash остаётся: в ответе его путь на хосте. keep: true завершает сессию и оставляет клоны. Вызов подтверждает человек.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'integer', description: 'Номер удалённой сессии из list_sessions.' },
+        keep: { type: 'boolean', description: 'Клоны не удалять.' },
+      },
+      required: ['id'],
+      additionalProperties: false,
+    },
+  };
+}
+
+function reportDoneTool(kind: SessionKind): McpTool {
   return {
     name: REPORT_DONE_TOOL,
     description:
       'Сдаёт итог работы: Cyborg пересылает его сессии, которая тебя запустила, либо показывает человеку уведомлением. ' +
-      'Вызывай, когда закончил, упёрся в препятствие или не справился; работу закоммить в свою ветку до вызова. ' +
+      `Вызывай, когда закончил, упёрся в препятствие или не справился; ${kind === 'remote' ? 'ветку запушь и PR открой до вызова' : 'работу закоммить в свою ветку до вызова'}. ` +
       'Сессия после итога остаётся: следующее сообщение начинает новый круг работы, и итог круга сдаётся снова. ' +
       'Если ответ - ошибка связи с Cyborg, вызов не состоялся: повтори его позже.',
     inputSchema: {
@@ -228,6 +294,61 @@ export function validateClose(value: unknown, peers: readonly PeerInfo[], caller
   return `сессия ${target.id} ${busy}: закрытие оборвёт её, закрыть всё же - force: true`;
 }
 
+export interface Limits {
+  max_agents_per_host?: number;
+  task_timeout_min?: number;
+  idle_timeout_min?: number;
+}
+
+export interface SpawnArgs {
+  host: string;
+  repo: string;
+  branch: string;
+  prompt: string;
+  limits?: Limits;
+  keep: boolean;
+}
+
+const LIMIT_RANGES: Record<keyof Limits, [number, number]> = {
+  max_agents_per_host: [1, 16],
+  task_timeout_min: [1, 1440],
+  idle_timeout_min: [1, 1440],
+};
+
+/** Аргументы spawn_agent от модели; ошибка - строка, её текст вернётся модели. */
+export function validateSpawn(value: unknown, dirs: readonly string[], hosts: readonly string[]): SpawnArgs | string {
+  const { host, repo, branch, prompt, limits, keep } = args(value);
+  if (typeof host !== 'string' || !hosts.includes(host)) return `host - один из хостов проекта: ${hosts.join(', ')}`;
+  if (typeof repo !== 'string' || !dirs.includes(repo)) return `repo - один из каталогов проекта: ${dirs.join(', ')}`;
+  const bad = branchNameProblem(branch);
+  if (bad) return bad;
+  if (typeof prompt !== 'string' || !prompt.trim()) return 'prompt - непустая строка';
+  const problem = promptProblem(prompt, 'prompt', ': сократи задание или передай его файлом');
+  if (problem) return problem;
+  if (keep !== undefined && typeof keep !== 'boolean') return 'keep - true или false';
+  const out: SpawnArgs = { host, repo, branch: branch as string, prompt: prompt.trim(), keep: keep === true };
+  if (limits === undefined) return out;
+  if (typeof limits !== 'object' || limits === null || Array.isArray(limits)) return 'limits - объект';
+  const parsed: Limits = {};
+  for (const [key, val] of Object.entries(limits)) {
+    const range = LIMIT_RANGES[key as keyof Limits];
+    if (!range) return `limits: неизвестное поле ${key}`;
+    if (typeof val !== 'number' || !Number.isInteger(val) || val < range[0] || val > range[1]) return `limits.${key} - целое от ${String(range[0])} до ${String(range[1])}`;
+    parsed[key as keyof Limits] = val;
+  }
+  return { ...out, limits: parsed };
+}
+
+/** close_agent: цель - удалённая вкладка проекта вызывающей, в любом состоянии. */
+export function validateCloseAgent(value: unknown, peers: readonly PeerInfo[]): { id: number; keep: boolean } | string {
+  const { id, keep } = args(value);
+  if (keep !== undefined && typeof keep !== 'boolean') return 'keep - true или false';
+  const target = peers.find((p) => p.id === id);
+  if (!target) return `сессии ${String(id)} нет среди вкладок проекта: номера - в list_sessions`;
+  if (!target.host) return `сессия ${String(target.id)} локальная: закрывается close_session`;
+  return { id: target.id, keep: keep === true };
+}
+
 export type ReportStatus = 'ok' | 'failed' | 'blocked';
 
 export interface ReportArgs {
@@ -283,6 +404,16 @@ export interface HandoffRequest {
   /** Номер сессии, поручившей работу. */
   from: number;
   repo: string;
+  /** Есть у spawn_agent: вкладка удалённая. */
+  host?: string;
+}
+
+/** Что нужно знать о передаче, чтобы открыть удалённую вкладку. */
+export interface RemoteHandoff {
+  host: string;
+  branch: string;
+  limits?: Limits;
+  keep: boolean;
 }
 
 export interface SessionsPort {
@@ -291,13 +422,26 @@ export interface SessionsPort {
   say(id: number, text: string): Promise<SayResult>;
   /** Сессию открыла другая сессия (open_session): ей отдаётся report_done. */
   isChild(id: number): boolean;
-  /** Итог локальной дочерней; текст ответа модели. */
+  /** Итог дочерней или удалённой сессии; текст ответа модели. */
   reportLocal(id: number, report: ReportArgs): string;
+  /** Вид вызывающей: у удалённой другой набор инструментов. */
+  kindOf?(id: number): SessionKind;
+  /** Хосты проекта, у которого каталоги запуска - dirs (спрашивается у remote-sessions). */
+  hostsOf?(dirs: readonly string[]): Promise<readonly string[]>;
+}
+
+/** Удалённая часть (её ведёт плагин remote-sessions): проверка хоста и лимитов, итог на хосте, завершение. Тексты результатов формирует она. */
+export interface RemoteToolsPort {
+  prepare(dirs: readonly string[], host: string, limits?: Limits): Promise<void>;
+  /** Итог круга отмечен на хосте (демон не закроет сессию по лимиту задачи). */
+  report(id: number): Promise<void>;
+  /** Завершает сессию на хосте и убирает клоны (keep - оставляет) и закрывает вкладку (она к этому времени могла выйти сама: ssh завершился вместе с сессией); ответ - текст итога для модели. */
+  close(id: number, keep: boolean): Promise<string>;
 }
 
 /** Поручение другой вкладке (`Handoffs.request` из handoff.ts): номер новой сессии, когда она открыта. */
 export interface HandoffPort {
-  request(from: number, repo: string, prompt: string): Promise<number>;
+  request(from: number, repo: string, prompt: string, remote?: RemoteHandoff): Promise<number>;
 }
 
 export function createSessionTools(
@@ -306,32 +450,42 @@ export function createSessionTools(
   /** Закрывает вкладку сессии и завершает её процесс. */
   close: (id: number) => void | Promise<void>,
   closeSelfDelayMs = CLOSE_SELF_DELAY_MS,
+  remote?: RemoteToolsPort,
 ): McpBackend {
-  const contextOf = (caller: number): ToolContext => ({ child: sessions.isChild(caller) });
+  const contextOf = async (caller: number, dirs: readonly string[]): Promise<ToolContext> => {
+    const kind = sessions.kindOf?.(caller) ?? 'local';
+    // Хосты спрашиваются у remote-sessions только когда есть кому ими распорядиться и вызывающая локальная.
+    const hosts = remote && kind === 'local' ? ((await sessions.hostsOf?.(dirs).catch(() => [])) ?? []) : [];
+    return { child: sessions.isChild(caller), kind, hosts };
+  };
   return {
-    tools: (caller) => {
+    tools: async (caller) => {
       const dirs = sessions.dirsOf(caller);
-      return dirs ? sessionTools(dirs, contextOf(caller)) : [];
+      return dirs ? sessionTools(dirs, await contextOf(caller, dirs)) : [];
     },
     call: async (caller, name, value) => {
       const dirs = sessions.dirsOf(caller);
       const peers = sessions.peers(caller);
       if (!dirs || !peers) throw new Error('сессия завершена');
+      const context = await contextOf(caller, dirs);
       // tools/call не обязан следовать tools/list: набор инструментов контекста - и есть право вызова.
-      if (!sessionTools(dirs, contextOf(caller)).some((t) => t.name === name)) throw new Error(`инструмент ${name} недоступен этой сессии`);
+      if (!sessionTools(dirs, context).some((t) => t.name === name)) throw new Error(`инструмент ${name} недоступен этой сессии`);
       if (name === LIST_SESSIONS_TOOL) return describePeers(peers, caller);
       if (name === SEND_TO_SESSION_TOOL) {
         const valid = validateSend(value, peers, caller);
         if (typeof valid === 'string') throw new Error(valid);
         const result = await sessions.say(valid.id, valid.message);
-        return result === 'queued' ? `Сессия ${valid.id} работает: сообщение в очереди Cyborg и уйдёт, когда она закончит ход.` : `Сообщение отправлено сессии ${valid.id}.`;
+        return result === 'queued' ? `Сессия ${String(valid.id)} работает: сообщение в очереди Cyborg и уйдёт, когда она закончит ход.` : `Сообщение отправлено сессии ${String(valid.id)}.`;
       }
       if (name === CLOSE_SESSION_TOOL) {
         const valid = validateClose(value, peers, caller);
         if (typeof valid === 'string') throw new Error(valid);
         if (valid.id !== caller) {
+          const target = peers.find((p) => p.id === valid.id);
+          // Чужую удалённую вкладку закрывают так же, как close_agent: на хосте убираются клоны.
+          if (target?.host && remote) return closeRemote(valid.id, false);
           await close(valid.id);
-          return `Вкладка сессии ${valid.id} закрыта.`;
+          return `Вкладка сессии ${String(valid.id)} закрыта.`;
         }
         setTimeout(() => void Promise.resolve(close(caller)).catch(() => undefined), closeSelfDelayMs);
         return 'Эта вкладка закроется через секунду.';
@@ -339,13 +493,38 @@ export function createSessionTools(
       if (name === REPORT_DONE_TOOL) {
         const valid = validateReport(value);
         if (typeof valid === 'string') throw new Error(valid);
+        if (context.kind === 'remote') {
+          if (!remote) throw new Error(`инструмент ${name} недоступен этой сессии`);
+          // Сначала проверка локального состояния (повторный итог за круг - отказ), затем отметка на хосте.
+          const text = sessions.reportLocal(caller, valid);
+          await remote.report(caller).catch(() => undefined);
+          return text;
+        }
         return sessions.reportLocal(caller, valid);
+      }
+      if (name === CLOSE_AGENT_TOOL && remote) {
+        const valid = validateCloseAgent(value, peers);
+        if (typeof valid === 'string') throw new Error(valid);
+        return closeRemote(valid.id, valid.keep);
+      }
+      if (name === SPAWN_AGENT_TOOL && remote) {
+        const valid = validateSpawn(value, dirs, context.hosts ?? []);
+        if (typeof valid === 'string') throw new Error(valid);
+        await remote.prepare(dirs, valid.host, valid.limits);
+        const id = await handoffs.request(caller, valid.repo, valid.prompt, { host: valid.host, branch: valid.branch, keep: valid.keep, ...(valid.limits && { limits: valid.limits }) });
+        return `Открыта вкладка удалённой сессии ${String(id)} на ${valid.host}: клоны готовятся, итог придёт сообщением после report_done.`;
       }
       if (name !== OPEN_SESSION_TOOL) throw new Error(`неизвестный инструмент ${name}`);
       const valid = validateOpenSession(value, dirs);
       if (typeof valid === 'string') throw new Error(valid);
       const id = await handoffs.request(caller, valid.repo, valid.prompt);
-      return `Открыта вкладка сессии ${id} в ${valid.repo}.`;
+      return `Открыта вкладка сессии ${String(id)} в ${valid.repo}.`;
     },
   };
+
+  /** Завершение удалённой сессии: на хосте процесс останавливается и клоны убираются, затем вкладка закрывается (это делает удалённая часть). */
+  async function closeRemote(id: number, keep: boolean): Promise<string> {
+    if (!remote) throw new Error('удалённые сессии недоступны');
+    return remote.close(id, keep);
+  }
 }

@@ -204,6 +204,28 @@ export interface SessionsV12 extends Sessions {
   uses(root: string): Promise<boolean>;
 }
 
+/** Удалённая сессия на SSH-хосте, привязанная к вкладке `sessions` (её ведёт `remote-sessions`). */
+export interface RemoteSessionBinding {
+  /** Алиас хоста из `~/.ssh/config`. */
+  readonly host: string;
+  /** Идентификатор сессии на хосте (UUID демона). */
+  readonly sid: string;
+  /** Токен MCP, который демон хоста записал в конфиг сессии: сервер `sessions` принимает его вместо выданного. 43 знака base64url. */
+  readonly token: string;
+}
+
+/**
+ * `cyborg.sessions` 1.3: `SessionsV12` и `adoptRemote` - привязка удалённой сессии к вкладке (M-05, решение 13). Токен удалённой сессии выбирает демон на хосте,
+ * поэтому `sessions` принимает его вместо выданного и помечает вкладку удалённой: ей отдаётся набор инструментов удалённой сессии (список, сообщение, итог), а не локальной.
+ */
+export interface SessionsV13 extends SessionsV12 {
+  /**
+   * Вызывается из `launch` поставщика `cyborg.agent` для сессии `sessionId` (id запуска), которой уже выдан токен. Негодный токен или сессия без выданного токена - отказ.
+   * Привязка живёт, пока жива сессия: выход процесса и закрытие вкладки отзывают токен.
+   */
+  adoptRemote(sessionId: string, remote: RemoteSessionBinding): Promise<void>;
+}
+
 // ---------- cyborg.git 1.1 ----------
 
 /** Ветки репозитория: текущая, локальные (свежие первыми) и ветки remote без локальной копии (без имени remote). */

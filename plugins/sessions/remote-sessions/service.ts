@@ -17,6 +17,7 @@ import { parseRemote } from './auth.ts';
 import { readHostDisk, readPurge, type HostDisk, type PurgeResult } from './host-disk.ts';
 import type { Host, Msg } from './host.ts';
 import { DEFAULT_LIMITS, START_SIZE } from './limits.ts';
+import type { Limits } from './protocol.ts';
 import type { Auth, CleanupResult, GitCred, RepoSpec } from './protocol.ts';
 
 /** Идентификатор сессии на хосте: UUID, как у isSessionId в ai-cyborg. */
@@ -28,6 +29,40 @@ export const SESSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9
  * Хост по идентификатору находит `locate`: по запомненной связи, иначе опросом хостов проектов.
  */
 export const resumeIdOf = (sid: string): string => sid;
+
+/** Пределы spawn_agent в минутах и штуках (как в инструменте); пусто - прежние по умолчанию. */
+export interface ToolLimits {
+  max_agents_per_host?: number;
+  task_timeout_min?: number;
+  idle_timeout_min?: number;
+}
+
+const LIMIT_RANGES: Record<keyof ToolLimits, [number, number]> = { max_agents_per_host: [1, 16], task_timeout_min: [1, 1440], idle_timeout_min: [1, 1440] };
+
+/** Пределы от человека или инструмента: целые в диапазоне; негодное - отказ (демон получает только проверенное). */
+export function readToolLimits(value: unknown): ToolLimits {
+  if (value === undefined) return {};
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) throw new Error('limits - объект');
+  const out: ToolLimits = {};
+  for (const [key, val] of Object.entries(value)) {
+    const range = LIMIT_RANGES[key as keyof ToolLimits];
+    if (!range) throw new Error(`limits: неизвестное поле ${key}`);
+    if (typeof val !== 'number' || !Number.isInteger(val) || val < range[0] || val > range[1]) throw new Error(`limits.${key} - целое от ${String(range[0])} до ${String(range[1])}`);
+    out[key as keyof ToolLimits] = val;
+  }
+  return out;
+}
+
+const minutes = (value: number | undefined, fallback: number): number => (value === undefined ? fallback : value * 60_000);
+
+/** Пределы для демона: те же числа, что DEFAULT_LIMITS, с заменой названного. */
+export function daemonLimits(limits: ToolLimits): Limits {
+  return {
+    maxPerHost: limits.max_agents_per_host ?? DEFAULT_LIMITS.maxPerHost,
+    taskMs: minutes(limits.task_timeout_min, DEFAULT_LIMITS.taskMs),
+    idleMs: minutes(limits.idle_timeout_min, DEFAULT_LIMITS.idleMs),
+  };
+}
 
 export interface HistoryEntryOut {
   id: string;
@@ -148,15 +183,46 @@ export class RemoteService {
     return this.spawn(project as ProjectView, args);
   }
 
-  /** Создание с заданием: для инструмента `spawn_agent` (M-04), человек пишет задание в терминал сам. */
+  /** Создание с заданием для инструмента `spawn_agent` (M-04/M-05): origin `tool`, пределы и `keep` из аргументов, номер открывшей вкладки - в запись сессии на хосте. */
   async createWithPrompt(projectId: unknown, value: unknown): Promise<RemoteInfo> {
     const project = typeof projectId === 'string' ? await this.deps.project(projectId) : undefined;
     const args = validateRemoteCreate(value, project);
     if (typeof args === 'string') throw new Error(args);
-    return this.spawn(project as ProjectView, args);
+    const extra = (typeof value === 'object' && value !== null ? value : {}) as Record<string, unknown>;
+    if (extra.keep !== undefined && typeof extra.keep !== 'boolean') throw new Error('keep - true или false');
+    const spawnedBy = extra.spawnedBy;
+    if (spawnedBy !== undefined && (typeof spawnedBy !== 'number' || !Number.isInteger(spawnedBy) || spawnedBy < 1)) throw new Error('spawnedBy - номер вкладки');
+    return this.spawn(project as ProjectView, args, { origin: 'tool', keep: extra.keep === true, limits: readToolLimits(extra.limits), ...(typeof spawnedBy === 'number' && { spawnedBy }) });
   }
 
-  private async spawn(project: ProjectView, args: RemoteCreateArgs): Promise<RemoteInfo> {
+  /** Хосты проекта: их спрашивает `sessions`, чтобы отдать агенту spawn_agent и close_agent. */
+  async hosts(projectId: unknown): Promise<string[]> {
+    const project = typeof projectId === 'string' ? await this.deps.project(projectId) : undefined;
+    return project ? [...project.hosts] : [];
+  }
+
+  /** Хост в порядке (проверка, демон) и под пределом числа сессий: до открытия вкладки spawn_agent (`prepare` в ai-cyborg). */
+  async prepare(projectId: unknown, host: unknown, limits: unknown): Promise<void> {
+    const scope = await this.scope(projectId, host);
+    const max = daemonLimits(readToolLimits(limits)).maxPerHost;
+    const live = (await this.listOf(scope.host)).filter((s) => s.exited !== true && s.asleep !== true).length;
+    if (live >= max) throw new Error(`на хосте ${String(host)} уже ${String(live)} удалённых сессий (предел ${String(max)})`);
+  }
+
+  /** Итог круга отмечен на хосте: демон не закроет сессию по лимиту задачи, пока не начался следующий круг. */
+  async report(resumeId: unknown): Promise<void> {
+    const id = await this.locate(resumeId);
+    if (!id) throw new Error('Некорректный номер сессии');
+    await id.host.ensure();
+    await id.host.request({ type: 'report', sid: id.sid });
+  }
+
+  /** Токен MCP новой удалённой сессии: 32 случайных байта base64url (43 знака), как у токенов `sessions`. */
+  token(): string {
+    return this.deps.secret();
+  }
+
+  private async spawn(project: ProjectView, args: RemoteCreateArgs, extra: { origin: 'human' | 'tool'; keep: boolean; limits: ToolLimits; spawnedBy?: number } = { origin: 'human', keep: false, limits: {} }): Promise<RemoteInfo> {
     const repos: RepoSpec[] = [];
     const withCredentials: string[] = [];
     for (const dir of project.repos) {
@@ -181,9 +247,10 @@ export class RemoteService {
       selected,
       branch: args.branch,
       ...(args.prompt ? { prompt: args.prompt } : {}),
-      origin: 'human',
-      keep: false,
-      limits: DEFAULT_LIMITS,
+      origin: extra.origin,
+      keep: extra.keep,
+      ...(extra.spawnedBy !== undefined && { spawnedBy: extra.spawnedBy }),
+      limits: daemonLimits(extra.limits),
       ...START_SIZE,
       auth,
       memory: [],
@@ -290,7 +357,7 @@ export class RemoteService {
   }
 
   /** Пробуждение без повторного `list`: его делает `launch`, который уже знает, что сессия спит. */
-  async wakeSession(host: Host, sid: string, dirs: string[], cwd0: string): Promise<RemoteInfo> {
+  async wakeSession(host: Host, sid: string, dirs: string[], cwd0: string, token: string = this.deps.secret()): Promise<RemoteInfo> {
     const urls: string[] = [];
     for (const dir of dirs) {
       const url = await this.deps.originUrl(dir);
@@ -298,7 +365,7 @@ export class RemoteService {
     }
     const auth = await this.auth(urls, urls[0]);
     // Номер вызвавшей из прошлого сна указывал бы на чужую вкладку: разбуженную ведёт человек.
-    const reply = await host.request({ type: 'wake', sid, token: this.deps.secret(), ...START_SIZE, auth });
+    const reply = await host.request({ type: 'wake', sid, token, ...START_SIZE, auth });
     const roots = Array.isArray(reply.clones) ? (reply.clones as string[]) : [];
     const cwd = String(reply.cwd ?? cwd0);
     this.deps.remember(sid, host.host);

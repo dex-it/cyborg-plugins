@@ -89,7 +89,7 @@ describe('создание и запуск удалённой сессии на 
     for (const resumeId of [undefined, 'abc', '-oProxyCommand=x', '11111111-1111-1111-1111-111111111111@evil', 'не@uuid']) {
       const spec = await r.agent.launch({ sessionId: 't', cwd, ...(resumeId !== undefined && { resumeId }) });
       assert.equal(spec.program, '$SHELL', String(resumeId));
-      assert.equal(spec.args[1], manifest.permissions.launch[1]?.args[1]);
+      assert.equal(spec.args[1], manifest.permissions.launch.find((r) => r.program === '$SHELL')?.args[1]);
     }
   });
 
