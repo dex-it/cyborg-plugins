@@ -13,7 +13,7 @@
     "check:plugins": "node scripts/each-plugin.ts check",
     "build": "node scripts/each-plugin.ts build",
     "typecheck": "tsc --noEmit && node scripts/each-plugin.ts typecheck",
-    "test": "node --test scripts/test/*.test.ts fixtures/test/*.test.ts && node scripts/each-plugin.ts test",
+    "test": "node --test --test-timeout=120000 scripts/test/*.test.ts fixtures/test/*.test.ts && node scripts/each-plugin.ts test",
     "bundle": "node scripts/bundle.ts",
     "new": "node scripts/new-plugin.ts",
     "contracts:gap": "node scripts/contracts.ts",

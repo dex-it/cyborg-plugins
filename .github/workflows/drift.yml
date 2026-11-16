@@ -1,0 +1,35 @@
+name: Drift
+
+# Раз в неделю: не ушёл ли ai-cyborg от якорного коммита матрицы паритета. Красный запуск значит, что в `master` ai-cyborg есть функции,
+# каналы, события или требования, которых нет в parity/matrix.json (или наоборот). Решение D-00 №10: новое после якоря идёт хвостовыми
+# задачами; здесь оно становится видно, а не теряется. Лечение: npm run parity -- <клон> --write-missing, назначить владельцев.
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  drift:
+    name: ai-cyborg master против матрицы
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: ai-cyborg (master)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: dex-it/ai-cyborg
+          path: .ai-cyborg
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: сверка матрицы с master ai-cyborg
+        run: npm run parity -- .ai-cyborg

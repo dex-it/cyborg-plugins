@@ -122,16 +122,19 @@ describe('фикстуры через шлюз ядра', { skip }, () => {
 
   it('медленный git: show-toplevel ждёт, остальное нет; репозиторий настоящий', async () => {
     using repo = fixtureRepo();
-    using box = toolbox({ slowGit: 0.3 });
+    using box = toolbox({ slowGit: 0.5 });
     await using kernel = await start(box);
+    // Время сравнивается друг с другом: абсолютные пороги ненадёжны под нагрузкой параллельного прогона.
     const t0 = Date.now();
     const status = await call(kernel, 'git', ['-C', repo.dir, 'status', '--short']);
+    const fast = Date.now() - t0;
     assert.equal(status.code, 0, status.stderr);
-    assert.ok(Date.now() - t0 < 280, 'status идёт без задержки');
     const t1 = Date.now();
     const top = await call(kernel, 'git', ['-C', repo.dir, 'rev-parse', '--show-toplevel']);
+    const slow = Date.now() - t1;
     assert.equal(top.code, 0, top.stderr);
-    assert.ok(Date.now() - t1 >= 290, 'rev-parse --show-toplevel ждёт задержку и через шлюз');
+    assert.ok(slow >= 450, `rev-parse --show-toplevel ждёт задержку и через шлюз: ${slow} мс`);
+    assert.ok(slow - fast >= 300, `быстрый ${fast} мс, медленный ${slow} мс`);
   });
 
   it('программа вне правил манифеста и флаг из deny отклоняются ядром: PermissionDenied, а не запуск', async () => {

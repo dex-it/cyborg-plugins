@@ -6,6 +6,6 @@
   "engines": { "node": ">=24" },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node --test test/*.test.ts"
+    "test": "node --test --test-timeout=60000 test/*.test.ts"
   }
 }

@@ -140,16 +140,19 @@ describe('shell и медленный git', () => {
 
   it('git без задержки идёт в настоящий git; rev-parse --show-toplevel ждёт FAKE_GIT_DELAY', () => {
     using repo = fixtureRepo();
-    using box = toolbox({ slowGit: 0.3 });
+    using box = toolbox({ slowGit: 0.5 });
     assert.ok(box.env.PATH?.startsWith(`${box.bin}:${path.join(box.root, 'slow-git')}`));
-    const fast = Date.now();
+    // Время сравнивается друг с другом, а не с порогом: под нагрузкой параллельного прогона абсолютные пороги ненадёжны.
+    const t0 = Date.now();
     const status = box.run('git', ['status', '--short'], { cwd: repo.dir });
+    const fast = Date.now() - t0;
     assert.equal(status.status, 0);
-    assert.ok(Date.now() - fast < 280, 'status не должен ждать');
-    const slow = Date.now();
+    const t1 = Date.now();
     const top = box.run('git', ['rev-parse', '--show-toplevel'], { cwd: repo.dir });
-    assert.ok(Date.now() - slow >= 290, 'rev-parse --show-toplevel ждёт задержку');
-    assert.equal(top.stdout.trim(), statSync(repo.dir).isDirectory() ? repo.git('rev-parse', '--show-toplevel').trim() : '');
+    const slow = Date.now() - t1;
+    assert.ok(slow >= 450, `rev-parse --show-toplevel ждёт задержку: ${slow} мс`);
+    assert.ok(slow - fast >= 300, `медленный вызов дольше быстрого на задержку: быстрый ${fast} мс, медленный ${slow} мс`);
+    assert.equal(top.stdout.trim(), repo.git('rev-parse', '--show-toplevel').trim());
   });
 });
 
