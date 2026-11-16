@@ -1,0 +1,31 @@
+#!/bin/sh
+# Настройки (FAKE_*) можно положить в файл fake.env рядом со скриптом: ядро передаёт процессам плагина только PATH, HOME, локаль и названное в правиле env,
+# поэтому до подставной программы, запущенной плагином, переменные тестов не доходят. Внешние переменные главнее значений из файла.
+_fd=$(dirname "$0"); [ -f "$_fd/fake.env" ] && . "$_fd/fake.env"
+# Подставной ssh для удалённых сессий: «хост» - эта же машина. Разбирает вызовы вида, как их строит ai-cyborg (`src/main/remote/ssh.ts`):
+#   ssh -T -o BatchMode=yes ... [-R туннель] -- <алиас> <команда>
+# и исполняет команду локально `sh -c`, stdin и код выхода сквозные. Туннели (-R) принимаются и игнорируются.
+# FAKE_SSH_LOG - журнал вызовов; FAKE_SSH_HOME - «домашний каталог хоста» (создаётся), чтобы установка в ~/.cyborg не трогала настоящий;
+# FAKE_SSH_FAIL=<алиас> - этот хост отказывает: «Permission denied», код 255 (как ssh без ключа).
+[ -n "$FAKE_SSH_LOG" ] && echo "$*" >> "$FAKE_SSH_LOG"
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --) shift; break;;
+    -o|-R|-L|-D|-i|-p|-F|-l|-J|-b|-c|-E|-e|-m|-O|-Q|-S|-w|-W) shift 2;;
+    -*) shift;;
+    *) break;;
+  esac
+done
+alias=$1
+[ $# -gt 0 ] && shift
+if [ -n "$FAKE_SSH_FAIL" ] && [ "$FAKE_SSH_FAIL" = "$alias" ]; then
+  echo "$alias: Permission denied (publickey)." >&2
+  exit 255
+fi
+if [ -n "$FAKE_SSH_HOME" ]; then
+  mkdir -p "$FAKE_SSH_HOME"
+  HOME=$FAKE_SSH_HOME
+  export HOME
+fi
+if [ $# -eq 0 ]; then exec sh; fi
+exec sh -c "$*"

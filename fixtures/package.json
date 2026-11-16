@@ -1,0 +1,11 @@
+{
+  "name": "@cyborg-plugins/fixtures",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Подставные программы и данные для тестов плагинов: claude, gh, glab, jira, ssh, shell, медленный git, каталог настроек Claude, магазин плагинов, временные git-репозитории",
+  "engines": { "node": ">=24" },
+  "exports": {
+    ".": "./index.ts"
+  }
+}

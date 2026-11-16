@@ -91,7 +91,7 @@ export default defineConfig({
         { label: 'Бандлы', items: [{ slug: 'bundles', label: 'Обзор' }, 'bundles/format', 'bundles/build'] },
         {
           label: 'Автору плагина',
-          items: [{ slug: 'authors', label: 'Обзор' }, 'authors/layout', 'authors/new-plugin', 'authors/card', 'authors/assets', 'authors/namespaces', 'authors/checks'],
+          items: [{ slug: 'authors', label: 'Обзор' }, 'authors/layout', 'authors/new-plugin', 'authors/card', 'authors/testing', 'authors/assets', 'authors/namespaces', 'authors/checks'],
         },
         {
           label: 'Разработка',

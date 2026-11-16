@@ -4,14 +4,16 @@
   "private": true,
   "type": "module",
   "description": "Плагины для приложений на ядре Cyborg Harness: каталог по назначению, бандлы, документация",
-  "engines": { "node": ">=24" },
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "harness:link": "node scripts/link-harness.ts",
     "check": "node scripts/check.ts",
     "check:plugins": "node scripts/each-plugin.ts check",
     "build": "node scripts/each-plugin.ts build",
     "typecheck": "tsc --noEmit && node scripts/each-plugin.ts typecheck",
-    "test": "node --test scripts/test/*.test.ts && node scripts/each-plugin.ts test",
+    "test": "node --test scripts/test/*.test.ts fixtures/test/*.test.ts && node scripts/each-plugin.ts test",
     "bundle": "node scripts/bundle.ts",
     "new": "node scripts/new-plugin.ts",
     "contracts:gap": "node scripts/contracts.ts",
@@ -23,5 +25,8 @@
   "devDependencies": {
     "@types/node": "^26.6.5",
     "typescript": "^6.0.3"
-  }
+  },
+  "workspaces": [
+    "fixtures"
+  ]
 }
