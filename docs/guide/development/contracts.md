@@ -38,7 +38,7 @@ description: "Результат спайка SP-01: какие контракт
 |---|---|---|---|
 | `cyborg.projects`, `cyborg.project-settings`, `cyborg.editor` описаны в каталоге контрактов, но в типах нет | три контракта целиком | [#256](https://github.com/dex-it/cyborg-harness/issues/256) | M-01, M-09, M-10, M-13, M-17 |
 | `cyborg.sessions` | `create`, `send`, `paste`, `labels`, `uses`; плагин `sessions` (M-03) объявил их сам в `contracts/` как `SessionsV12` и добавил `setLabels` и `find` | [#257](https://github.com/dex-it/cyborg-harness/issues/257) | M-03 (решено через `contracts/`), M-08, M-13, M-17 |
-| `cyborg.git` | `root`, `branch`, `headContent`, `branches`, `switch`, `remotes`, `files` | [#258](https://github.com/dex-it/cyborg-harness/issues/258) | M-08, M-10, M-12, M-13 |
+| `cyborg.git` | `root`, `branch`, `headContent`, `branches`, `switch`, `remotes`, `files`; плагин `git` (M-08) объявил их сам в `contracts/` как `GitV11` (контракт 1.1) | [#258](https://github.com/dex-it/cyborg-harness/issues/258) | M-08 (решено через `contracts/`), M-10, M-12, M-13 |
 | `cyborg.session-prompt` | явный порядок фрагментов (`order`) | [#259](https://github.com/dex-it/cyborg-harness/issues/259) | M-06 (дословность промпта) |
 | Долгоживущий процесс со стримингом | `ctx.os.process.run` ждёт завершения, `pty` смешивает потоки | [#260](https://github.com/dex-it/cyborg-harness/issues/260) | M-05 (SSH) |
 | Голосовой ввод | микрофон кадра вида, поток вид - главная часть, сокет-сервер | [#261](https://github.com/dex-it/cyborg-harness/issues/261) | часть M-05 |

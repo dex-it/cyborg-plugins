@@ -22,7 +22,6 @@
     "planned": [
       { "id": "files", "summary": "Дерево файлов сессии с отметками git", "from": "ai-cyborg" },
       { "id": "viewer", "summary": "Просмотр файлов с подсветкой, сравнение с HEAD, правка Markdown, запуск файла в системном терминале", "from": "ai-cyborg" },
-      { "id": "git", "summary": "Ветка, статус, смена ветки, содержимое HEAD", "from": "ai-cyborg" },
       { "id": "search", "summary": "Поиск файла по имени и строки в содержимом и среди изменений", "from": "ai-cyborg" }
     ]
   },

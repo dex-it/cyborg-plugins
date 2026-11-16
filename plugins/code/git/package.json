@@ -1,0 +1,11 @@
+{
+  "name": "@cyborg-plugins/git",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --test --test-timeout=60000 test/*.test.ts"
+  }
+}

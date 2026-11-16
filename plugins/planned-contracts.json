@@ -12,7 +12,6 @@
   },
   "plugins": {
     "next-actions": {"provides": {"cyborg.agent-tool": "1.0", "cyborg.session-prompt": "1.0"}},
-    "git": {"provides": {"cyborg.git": "1.0", "cyborg.tree-decoration": "1.0"}, "optional": {"cyborg.sessions": "^1"}},
     "files": {"requires": {"cyborg.projects": "^1"}, "optional": {"cyborg.sessions": "^1", "cyborg.git": "^1"}, "consumes": {"cyborg.tree-decoration": "^1"}},
     "viewer": {"provides": {"cyborg.editor": "1.0"}, "optional": {"cyborg.git": "^1"}},
     "search": {"requires": {"cyborg.projects": "^1"}, "optional": {"cyborg.git": "^1"}},

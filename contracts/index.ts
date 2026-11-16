@@ -1,9 +1,9 @@
-// Типы контрактов, которых ещё нет в @cyborg-harness/contracts: cyborg.projects, cyborg.project-settings, cyborg.editor, а также расширение cyborg.sessions 1.2.
+// Типы контрактов, которых ещё нет в @cyborg-harness/contracts: cyborg.projects, cyborg.project-settings, cyborg.editor, а также расширения cyborg.sessions 1.2 (SessionsV12) и cyborg.git 1.1 (GitV11).
 // Только типы и дополнение карты Contracts, кода здесь нет: потребитель берёт файл через `import type`, а `cyborg-plugin check`
 // с `--declarations-package @cyborg-plugins/contracts` не пускает отсюда значения в код плагина.
 // Типы временные: после cyborg-harness#256 переезжают в пакет ядра, а этот пакет исчезает (README рядом).
 
-import type { Sessions, Subscription } from '@cyborg-harness/contracts';
+import type { Git, Sessions, Subscription } from '@cyborg-harness/contracts';
 
 declare module '@cyborg-harness/contracts' {
   interface Contracts {
@@ -224,4 +224,48 @@ export interface SessionsV13 extends SessionsV12 {
    * Привязка живёт, пока жива сессия: выход процесса и закрытие вкладки отзывают токен.
    */
   adoptRemote(sessionId: string, remote: RemoteSessionBinding): Promise<void>;
+}
+
+// ---------- cyborg.git 1.1 ----------
+
+/** Ветки репозитория: текущая, локальные (свежие первыми) и ветки remote без локальной копии (без имени remote). */
+export interface GitBranches {
+  /** Текущая ветка; голова отсоединена или репозитория нет - `null`. */
+  readonly current: string | null;
+  readonly local: readonly string[];
+  /** `git switch` по такому имени заведёт локальную ветку с отслеживанием. */
+  readonly remote: readonly string[];
+}
+
+/** Итог смены ветки: отказ словами (причина git, закрытая защитой или работающая сессия) или пустой объект, когда ветка сменилась. */
+export interface GitSwitchResult {
+  readonly error?: string;
+}
+
+/**
+ * `cyborg.git` 1.1, кратность one, поставщик `git`: расширение интерфейса ядра (`Git`: `status`, `onChange`) членами каталога контрактов,
+ * которых в типах ядра ещё нет ([cyborg-harness#258](https://github.com/dex-it/cyborg-harness/issues/258)): `root`, `branch`, `headContent`,
+ * `branches`, `switch`, `remotes`, `files`. Типы временные и переедут в пакет ядра. Потребитель берёт поставщика как `Remote<GitV11>`
+ * и проверяет, что нужный член есть: поставщик 1.0 их не даёт.
+ * Все члены с путём объявлены с `guard` `fs.read` на первый аргумент: вызывающий без права читать каталог сведений о нём не получает.
+ */
+export interface GitV11 extends Git {
+  /** Корень рабочего дерева, которому принадлежит каталог; не репозиторий - `null`. */
+  root(dir: string): Promise<string | null>;
+  /** Имя ветки; голова отсоединена - `HEAD` (как у `rev-parse --abbrev-ref`); репозитория или коммитов нет - `null`. */
+  branch(root: string): Promise<string | null>;
+  /** Текст файла в HEAD его репозитория; нет репозитория, файла в HEAD, файл двоичный или больше 5 МиБ - `null`. */
+  headContent(file: string): Promise<string | null>;
+  /** Ветки репозитория; `root` должен быть репозиторием проекта (`cyborg.projects`), иначе отказ. Не репозиторий - пустые списки. */
+  branches(root: string): Promise<GitBranches>;
+  /**
+   * Меняет ветку командой `git switch` по имени из `branches` (чужое имя, начинающееся с «-», отказ). Отказ ведёт `error`: в конфиге репозитория есть `filter.*`,
+   * докачка partial clone или команда из конфига, в репозитории работает сессия (`cyborg.sessions.uses`), git не смог (причина первой строкой). Незакоммиченные правки git переносит сам или отказывает.
+   * `root` не репозиторий проекта или `branch` не строка - исключение.
+   */
+  switch(root: string, branch: string): Promise<GitSwitchResult>;
+  /** Адреса всех fetch-remote репозитория; не репозиторий или нет remote - пусто. */
+  remotes(root: string): Promise<string[]>;
+  /** Файлы под `root` относительно него, без игнорируемых `.gitignore`; `root` не в git - `null`. */
+  files(root: string): Promise<string[] | null>;
 }
