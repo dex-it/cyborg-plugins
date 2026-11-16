@@ -8,6 +8,8 @@ _fd=$(dirname "$0"); [ -f "$_fd/fake.env" ] && . "$_fd/fake.env"
 # FAKE_SSH_LOG - журнал вызовов; FAKE_SSH_HOME - «домашний каталог хоста» (создаётся), чтобы установка в ~/.cyborg не трогала настоящий;
 # FAKE_SSH_FAIL=<алиас> - этот хост отказывает: «Permission denied», код 255 (как ssh без ключа).
 [ -n "$FAKE_SSH_LOG" ] && echo "$*" >> "$FAKE_SSH_LOG"
+# `ssh -V` печатает версию в stderr, как OpenSSH (плагин remote-sessions спрашивает её в facts).
+[ "$1" = "-V" ] && { echo "OpenSSH_9.6p1 Fake, fixtures" >&2; exit 0; }
 while [ $# -gt 0 ]; do
   case "$1" in
     --) shift; break;;
@@ -26,6 +28,8 @@ if [ -n "$FAKE_SSH_HOME" ]; then
   mkdir -p "$FAKE_SSH_HOME"
   HOME=$FAKE_SSH_HOME
   export HOME
+  # Настоящий ssh начинает в домашнем каталоге хоста: относительные пути удалённых команд (`sh .cyborg/agentd/...`) считаются от него.
+  cd "$HOME" || exit 1
 fi
 if [ $# -eq 0 ]; then exec sh; fi
 exec sh -c "$*"

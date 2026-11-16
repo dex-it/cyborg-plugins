@@ -1,0 +1,200 @@
+{
+  "$schema": "../../../node_modules/@cyborg-harness/contracts/manifest.schema.json",
+  "id": "remote-sessions",
+  "version": "1.0.0",
+  "engines": {
+    "cyborg": "^1"
+  },
+  "provides": {
+    "cyborg.agent": "1.0",
+    "cyborg.project-settings": "1.0"
+  },
+  "optional": {
+    "cyborg.projects": "^1"
+  },
+  "commands": {
+    "remote-sessions.create": {
+      "args": [
+        "string",
+        "record"
+      ],
+      "callers": "plugins"
+    },
+    "remote-sessions.create-task": {
+      "args": [
+        "string",
+        "record"
+      ],
+      "callers": "plugins"
+    },
+    "remote-sessions.discover": {
+      "args": [
+        "string"
+      ],
+      "callers": "plugins"
+    },
+    "remote-sessions.history": {
+      "args": [
+        "string"
+      ],
+      "callers": "plugins"
+    },
+    "remote-sessions.wake": {
+      "args": [
+        "string",
+        "string",
+        "string"
+      ],
+      "callers": "plugins"
+    },
+    "remote-sessions.remove-asleep": {
+      "args": [
+        "string",
+        "string",
+        "string"
+      ]
+    },
+    "remote-sessions.disk": {
+      "args": [
+        "string",
+        "string"
+      ]
+    },
+    "remote-sessions.purge": {
+      "args": [
+        "string",
+        "string",
+        "strings",
+        "boolean?"
+      ]
+    },
+    "remote-sessions.close": {
+      "args": [
+        "string",
+        "boolean?"
+      ],
+      "callers": "plugins"
+    },
+    "remote-sessions.fs": {
+      "args": [
+        "string",
+        "string",
+        "string"
+      ],
+      "callers": "plugins"
+    },
+    "remote-sessions.search": {
+      "args": [
+        "string",
+        "string",
+        "record"
+      ],
+      "callers": "plugins"
+    },
+    "remote-sessions.claude-token.status": {},
+    "remote-sessions.claude-token.set": {
+      "args": [
+        "string"
+      ]
+    },
+    "remote-sessions.claude-token.clear": {}
+  },
+  "permissions": {
+    "process": [
+      {
+        "program": "ssh",
+        "args": [
+          "-T",
+          "-o",
+          "BatchMode=yes",
+          "-o",
+          "ConnectTimeout=15",
+          "-o",
+          "ServerAliveInterval=15",
+          "-o",
+          "ServerAliveCountMax=3",
+          "-o",
+          "ExitOnForwardFailure=yes",
+          "--"
+        ],
+        "env": [
+          "SSH_AUTH_SOCK"
+        ]
+      },
+      {
+        "program": "ssh",
+        "args": [
+          "-V"
+        ]
+      },
+      {
+        "program": "git",
+        "args": [
+          "remote",
+          "get-url",
+          "origin"
+        ]
+      },
+      {
+        "program": "gh",
+        "args": [
+          "auth",
+          "token",
+          "--hostname"
+        ]
+      },
+      {
+        "program": "glab",
+        "args": [
+          "config",
+          "get",
+          "token",
+          "--host"
+        ]
+      }
+    ],
+    "launch": [
+      {
+        "program": "ssh",
+        "args": [
+          "-tt",
+          "-o",
+          "BatchMode=yes",
+          "-o",
+          "ConnectTimeout=15",
+          "-o",
+          "ServerAliveInterval=15",
+          "-o",
+          "ServerAliveCountMax=3",
+          "-o",
+          "ExitOnForwardFailure=yes",
+          "--"
+        ],
+        "env": [
+          "SSH_AUTH_SOCK"
+        ]
+      },
+      {
+        "program": "$SHELL",
+        "args": [
+          "-lc",
+          "echo 'remote-sessions: не выбрана удалённая сессия: создайте её командой remote-sessions.create и откройте по resumeId' >&2; exit 2"
+        ]
+      }
+    ],
+    "env": [
+      "SSH_AUTH_SOCK"
+    ],
+    "fs.read": [
+      "workspace"
+    ]
+  },
+  "config": {
+    "version": 1,
+    "schema": "./config.schema.json"
+  },
+  "state": {
+    "version": 1,
+    "schema": "./state.schema.json"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "type": "object",
+  "properties": {
+    "instance": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false
+}

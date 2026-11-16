@@ -1,0 +1,13 @@
+{
+  "name": "@cyborg-plugins/remote-sessions",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --test --test-timeout=120000 test/*.test.ts && node ../../../companions/agentd/scripts/test.mjs"
+  }
+}

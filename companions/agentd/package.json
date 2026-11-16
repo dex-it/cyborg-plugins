@@ -1,0 +1,11 @@
+{
+  "name": "@cyborg-plugins/companion-agentd",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Демон для SSH-хоста (remote-sessions): исходники из ai-cyborg на якоре 6fd308f без правок и их тесты",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node scripts/test.mjs"
+  }
+}
