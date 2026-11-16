@@ -1,0 +1,182 @@
+/* Виды «Сессии» и «Сессии проекта»: на токенах темы окна (--cy-*), цвета не заданы руками. Цвет вкладки - переменная --session (по документу). */
+
+#bar {
+  display: flex;
+  align-items: center;
+  gap: var(--cy-gap);
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--cy-border);
+}
+
+#strip {
+  display: flex;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 22em;
+  padding: 4px 8px;
+  border: 1px solid var(--cy-border);
+  border-top: 3px solid var(--session, var(--cy-border));
+  border-radius: var(--cy-radius) var(--cy-radius) 0 0;
+  background: var(--cy-surface);
+  color: var(--cy-muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.tab.active {
+  color: var(--cy-fg);
+  background: var(--cy-bg);
+}
+
+.tab.dragging {
+  opacity: 0.5;
+}
+
+.tab.drop-target {
+  outline: 2px solid var(--session, var(--cy-fg));
+}
+
+.tab .label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tab .dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--cy-muted);
+}
+
+.tab[data-state='working'] .dot {
+  background: var(--session, var(--cy-fg));
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+.tab[data-state='waiting'] .dot {
+  background: #f59e0b;
+}
+
+.tab[data-state='exited'] {
+  opacity: 0.7;
+  font-style: italic;
+}
+
+.tab .close {
+  flex: none;
+  padding: 0 2px;
+  border-radius: var(--cy-radius);
+}
+
+.tab .close:hover {
+  background: var(--cy-border);
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+#stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.pane {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  border-top: 2px solid var(--session, transparent);
+}
+
+.pane[hidden] {
+  display: none;
+}
+
+.term-host {
+  flex: 1;
+  min-height: 0;
+  padding: 4px 6px;
+  background: var(--cy-surface);
+}
+
+.term-host .xterm {
+  height: 100%;
+}
+
+.notice {
+  display: flex;
+  align-items: center;
+  gap: var(--cy-gap);
+  padding: 6px 10px;
+  border-top: 1px solid var(--cy-border);
+  color: var(--cy-muted);
+}
+
+.notice[hidden] {
+  display: none;
+}
+
+#empty {
+  height: 100%;
+  font-family: var(--cy-font);
+}
+
+/* Сессии проекта */
+
+#selection {
+  display: flex;
+  align-items: center;
+  gap: var(--cy-gap);
+  padding: 4px 6px;
+}
+
+#selection[hidden] {
+  display: none;
+}
+
+#note {
+  margin: 6px 10px;
+  color: var(--cy-muted);
+}
+
+#history {
+  display: flex;
+  flex-direction: column;
+}
+
+.history-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.history-item[data-selected='true'] {
+  background: var(--cy-border);
+}
+
+.history-item .history-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-item .repo-path {
+  flex: none;
+  color: var(--cy-muted);
+}

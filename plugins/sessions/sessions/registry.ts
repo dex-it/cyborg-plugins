@@ -49,6 +49,11 @@ export class Registry {
     return tab?.handle ? tab : undefined;
   }
 
+  /** Все вкладки этого запуска: идущие и вышедшие, в порядке открытия. */
+  all(): Tab[] {
+    return [...this.tabs.values()];
+  }
+
   liveTabs(): Tab[] {
     return [...this.tabs.values()].filter((t) => t.handle);
   }

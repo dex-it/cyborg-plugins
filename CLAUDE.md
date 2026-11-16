@@ -23,7 +23,7 @@ Cyborg Plugins - репозиторий плагинов для приложен
 
 ## Карта
 
-- `plugins/<категория>/<id>/` - плагины; перечень категорий и запланированных плагинов - `plugins/categories.json`; категория определяется только путём, в манифест она не пишется (манифест ядра не принимает чужих полей)
+- `plugins/<категория>/<id>/` - плагины; перечень категорий и запланированных плагинов - `plugins/categories.json`; категория определяется только путём, в манифест она не пишется (манифест ядра не принимает чужих полей); каждый плагин - npm workspace (`plugins/*/*`), его npm-зависимости (`dependencies` в `package.json` плагина, например `@xterm/xterm` у `sessions`) ставит корневой `npm ci`, а `cyborg-plugin build` вкладывает их в бандл вида
 - `plugins/<категория>/<id>/README.md` - карточка плагина: шапка `---` (title, summary, status, tags, needs), дальше описание с `##`
 - `plugins/planned-contracts.json` - проектная модель контрактов запланированных плагинов (provides, requires, optional, consumes, нужные члены); готовый плагин из неё убирается
 - `bundles/<id>.json` - бандл (`format: 1`, id равен имени файла, version, title, description, extends, plugins); `bundles/planned.json` - запланированные наборы

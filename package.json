@@ -28,6 +28,7 @@
   },
   "workspaces": [
     "fixtures",
-    "contracts"
+    "contracts",
+    "plugins/*/*"
   ]
 }
