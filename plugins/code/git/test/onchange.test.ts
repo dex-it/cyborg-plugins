@@ -37,11 +37,23 @@ describe('git: onChange', () => {
     t.clean();
   });
 
+  it('коммит без изменения индекса (--allow-empty) и ветка, созданная снаружи, тоже оповещают: слежение за refs/heads', async () => {
+    using r = repo({ files: { 'a.txt': 'a\n' } });
+    await using t = await rig({ repos: [r.dir], countWatches: true });
+    const w = await t.watch(r.dir);
+    r.git('commit', '-q', '--allow-empty', '-m', 'empty');
+    await until('оповещение после пустого коммита', () => w.count() > 0);
+    const seen = w.count();
+    await pause(300);
+    r.git('branch', 'created-outside');
+    await until('оповещение о новой ветке', () => w.count() > seen);
+    assert.ok((await t.git.branches(r.dir)).local.includes('created-outside'));
+  });
+
   it('смена ветки самим плагином тоже оповещает подписчиков: дерево перерисуется без опроса', async () => {
     using r = repo({ branches: ['feature'] });
     await using t = await rig({ repos: [r.dir], countWatches: true });
     const w = await t.watch(r.dir);
-    await until('слежение за .git открыто', () => t.watches.live() === 1);
     assert.deepEqual(await t.git.switch(r.dir, 'feature'), {});
     await until('оповещение после switch', () => w.count() > 0);
   });
@@ -50,7 +62,7 @@ describe('git: onChange', () => {
     using r = repo({ files: { 'a.txt': 'a\n' } });
     await using t = await rig({ repos: [r.dir], countWatches: true });
     const w = await t.watch(r.dir);
-    await until('слежение за .git открыто', () => t.watches.live() === 1);
+    assert.equal(t.watches.live(), 2, 'каталог git и refs/heads');
     r.write('a.txt', 'a\n');
     // Файл переписан с тем же содержимым: stat расходится, индекс при опросе без --no-optional-locks был бы обновлён.
     for (let i = 0; i < 5; i++) await t.git.status(r.dir);
@@ -66,13 +78,12 @@ describe('git: onChange', () => {
     await using t = await rig({ repos: [r.dir], countWatches: true });
     const a = await t.watch(r.dir);
     const b = await t.watch(r.dir);
-    await until('слежение открыто', () => t.watches.live() === 1);
-    assert.equal(t.watches.opened.length, 1, 'одно слежение на репозиторий');
+    assert.deepEqual(t.watches.opened, [path.join(r.dir, '.git'), path.join(r.dir, '.git', 'refs', 'heads')], 'одна пара слежений на репозиторий');
     r.git('commit', '-q', '--allow-empty', '-m', 'one');
     await until('оба подписчика оповещены', () => a.count() > 0 && b.count() > 0);
     a.dispose();
     await pause(100);
-    assert.equal(t.watches.live(), 1, 'второй подписчик держит слежение');
+    assert.equal(t.watches.live(), 2, 'второй подписчик держит слежение');
     const seen = b.count();
     r.git('commit', '-q', '--allow-empty', '-m', 'two');
     await until('оставшийся подписчик оповещён', () => b.count() > seen);
@@ -87,8 +98,7 @@ describe('git: onChange', () => {
     await using t = await rig({ repos: [r.dir], countWatches: true });
     await t.tree.marks(r.dir);
     const w = await t.watch(r.dir);
-    await until('слежение открыто', () => t.watches.live() === 1);
-    assert.equal(t.watches.opened.length, 1, 'слежение дерева и onChange делят одно');
+    assert.equal(t.watches.opened.length, 2, 'слежение дерева и onChange делят одну пару');
     assert.ok(w);
     await t.kernel.disable('git');
     await until('слежение снято при выгрузке', () => t.watches.live() === 0);
@@ -103,7 +113,7 @@ describe('git: onChange', () => {
       await using t = await rig({ repos: [main.dir, wt], countWatches: true });
       const w = await t.watch(wt);
       const gitdir = path.join(main.dir, '.git', 'worktrees', 'wt');
-      await until('слежение за gitdir worktree открыто', () => t.watches.opened.includes(gitdir));
+      assert.deepEqual(t.watches.opened, [gitdir, path.join(main.dir, '.git', 'refs', 'heads')], 'каталог worktree и общие refs/heads');
       assert.equal((await t.git.status(wt))?.branch, 'wt');
 
       writeFileSync(path.join(wt, 'n.txt'), 'n\n');
@@ -124,7 +134,7 @@ describe('git: onChange', () => {
       main.git('worktree', 'add', '-q', '-b', 'wt', wt);
       // workspace - только worktree: `.git` указывает в каталог основного репозитория, который плагину читать нельзя.
       await using t = await rig({ repos: [wt], countWatches: true });
-      await t.watch(wt);
+      await t.watch(wt, { arm: false });
       assert.equal((await t.git.status(wt))?.branch, 'wt', 'status работает: git читает свой каталог сам');
       await pause(200);
       assert.equal(t.watches.opened.length, 0, 'gitdir вне области чтения: слежения нет');
@@ -140,7 +150,7 @@ describe('git: onChange', () => {
     await using t = await rig({ repos: [outer.dir], countWatches: true });
     outer.git('-c', 'protocol.file.allow=always', 'submodule', 'add', '-q', inner.dir, 'sub');
     const sub = path.join(outer.dir, 'sub');
-    await t.watch(sub);
+    await t.watch(sub, { arm: false });
     await until('слежение за каталогом подмодуля открыто', () => t.watches.opened.includes(path.join(outer.dir, '.git', 'modules', 'sub')));
   });
 
@@ -154,7 +164,7 @@ describe('git: onChange', () => {
         dirs.push(dir);
       }
       await using t = await rig({ repos: dirs, countWatches: true });
-      for (const dir of dirs) await t.watch(dir);
+      for (const dir of dirs) await t.watch(dir, { arm: false });
       await until('отказ семнадцатому', () => t.logs.some((l) => l.includes('больше чем за 16')));
       await until('открыто ровно 16 слежений', () => t.watches.live() === 16);
       await pause(100);

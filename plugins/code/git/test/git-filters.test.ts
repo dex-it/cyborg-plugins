@@ -8,6 +8,7 @@ import { appendFileSync, chmodSync, existsSync, mkdirSync, mkdtempSync, realpath
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, it } from 'node:test';
+import { filterOverrides, type FilterHost } from '../filters.ts';
 import { letters, repo, rig, type Repo } from './kit.ts';
 
 const ENV = { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null', GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@example.com', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@example.com' };
@@ -260,6 +261,18 @@ describe('git: status не запускает фильтры из конфига
     } finally {
       rmSync(base, { recursive: true, force: true });
     }
+  });
+
+  // Платформенно независимая проверка того же утверждения: ФС с именами не в UTF-8 есть не везде (APFS отвергает их), а отказ - в разборе вывода `ls-files`.
+  it('gitlink с путём не в UTF-8 (U+FFFD в выводе ls-files) - отказ, а не пропуск: пропущенный подмодуль запустил бы свой фильтр', async () => {
+    const out = (stdout: string) => ({ code: 0, signal: null, stdout, stderr: '', truncated: false });
+    const host: FilterHost = {
+      git: async (args) => (args.includes('config') ? { ...out(''), code: 1 } : out(`160000 ${'a'.repeat(40)} 0\tp\uFFFDq\0`)),
+      populated: async () => false,
+    };
+    await assert.rejects(filterOverrides(host, '/repo'), /путь вложенного репозитория не в UTF-8/);
+    const clean: FilterHost = { ...host, git: async (args) => (args.includes('config') ? { ...out(''), code: 1 } : out(`160000 ${'a'.repeat(40)} 0\tsub\0`)) };
+    assert.deepEqual(await filterOverrides(clean, '/repo'), { GIT_CONFIG_COUNT: '0' }, 'незаполненный подмодуль с нормальным именем пропускается');
   });
 
   it('status не перекрывает фильтр из глобального конфига: он доверенный', async () => {

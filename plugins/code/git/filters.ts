@@ -59,10 +59,12 @@ async function repoFilterKeys(host: FilterHost, dir: string, depth: number): Pro
   for (const entry of index.stdout.split('\0')) {
     if (!entry.startsWith(GITLINK)) continue;
     const rel = entry.slice(entry.indexOf('\t') + 1);
+    // Путь не в UTF-8 строкой не представим: проверить, заполнен ли подмодуль, и найти его фильтры нельзя, а пропустить - значит дать его фильтру запуститься.
+    // ai-cyborg читал байты и отказывал только для заполненного подмодуля; здесь отказ и для пустого каталога (редкий случай, цена - статус без отметок).
+    if (rel.includes(BROKEN_TEXT)) throw new Error('путь вложенного репозитория не в UTF-8, перекрыть его фильтры нельзя');
     const sub = nested(dir, rel);
     // Незаполненный подмодуль git status не открывает, а git из него нашёл бы родителя и зациклил рекурсию.
     if (sub === undefined || !(await host.populated(sub))) continue;
-    if (rel.includes(BROKEN_TEXT)) throw new Error('путь вложенного репозитория не в UTF-8, перекрыть его фильтры нельзя');
     populated.push(sub);
   }
   if (populated.length > 0 && depth >= MAX_DEPTH) throw new Error('вложенность репозиториев глубже предела');

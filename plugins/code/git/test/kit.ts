@@ -3,6 +3,7 @@
 // Программа git в PATH - обёртка: пишет аргументы каждого запуска в журнал (по нему тесты считают запуски) и передаёт настоящему git (или медленному из `toolbox({ slowGit })`).
 
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { chmodSync, mkdirSync, readFileSync, realpathSync, watch as watchFs, writeFileSync, type FSWatcher } from 'node:fs';
 import path from 'node:path';
 import type { GitStatus, PluginContext, Remote, TreeDecoration } from '@cyborg-harness/contracts';
@@ -10,6 +11,8 @@ import type { GitV11, SessionsV12 } from '@cyborg-plugins/contracts';
 import type { OsEnvironment } from '@cyborg-harness/core';
 import { startKernel, type InlinePlugin, type StartKernelOptions, type TestKernel } from '@cyborg-harness/testing';
 import { fixtureRepo, toolbox, type FixtureRepo, type Toolbox } from '@cyborg-plugins/fixtures';
+
+const GIT_ENV = { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null' };
 
 export const PLUGIN_DIR = path.resolve(import.meta.dirname, '..');
 
@@ -241,8 +244,12 @@ export interface Rig extends AsyncDisposable {
   readonly logs: string[];
   /** Журнал ядра без отказов и сбоев (иначе падает). */
   clean(): void;
-  /** Подписывается на `onChange` как потребитель и копит события. */
-  watch(repoDir: string): Promise<{ count(): number; dispose(): void }>;
+  /**
+   * Подписывается на `onChange` как потребитель и копит события. Слежение ядра начинает доставку позже возврата `watch` (FSEvents, inotify на нагруженном раннере),
+   * поэтому пока событие не пришло, головной файл переписывается заново (`symbolic-ref HEAD`, состояние репозитория не меняется); после первого события счётчик обнуляется.
+   * `arm: false` - без этого (слежение, которое событий не даст).
+   */
+  watch(repoDir: string, options?: { readonly arm?: boolean }): Promise<{ count(): number; dispose(): void }>;
 }
 
 /**
@@ -313,10 +320,22 @@ export async function rig(options: RigOptions = {}): Promise<Rig> {
       const bad = kernel.journal.filter((e) => e.kind === 'failed' || e.kind === 'invalid' || e.kind === 'rejected' || e.kind === 'denied');
       assert.deepEqual(bad, []);
     },
-    async watch(repoDir) {
+    async watch(repoDir, options = {}) {
       let n = 0;
       const sub = await git.onChange(repoDir, () => void n++);
       subscriptions.push(sub);
+      if (options.arm !== false) {
+        const end = Date.now() + 10_000;
+        const head = execFileSync('git', ['-C', repoDir, 'symbolic-ref', 'HEAD'], { encoding: 'utf8', env: GIT_ENV }).trim();
+        while (n === 0) {
+          if (Date.now() > end) assert.fail(`слежение за ${repoDir} не отозвалось за 10 с`);
+          execFileSync('git', ['-C', repoDir, 'symbolic-ref', 'HEAD', head], { env: GIT_ENV });
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+        // Хвост пачки событий пробы дожидается паузой: после неё считается только то, что сделает тест.
+        await new Promise((resolve) => setTimeout(resolve, 400));
+        n = 0;
+      }
       return { count: () => n, dispose: () => sub.dispose() };
     },
     [Symbol.asyncDispose]: async () => {
