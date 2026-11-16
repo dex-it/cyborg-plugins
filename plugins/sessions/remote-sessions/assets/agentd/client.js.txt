@@ -200,7 +200,12 @@ function listenTunnel(t) {
     client.on("close", () => up.destroy());
     up.on("close", () => client.destroy());
   });
-  server.listen(t.fwd, () => import_node_fs.default.chmodSync(t.fwd, 384));
+  const previousUmask = process.umask(127);
+  try {
+    server.listen(t.fwd, () => import_node_fs.default.chmodSync(t.fwd, 384));
+  } finally {
+    process.umask(previousUmask);
+  }
   const quit = () => {
     server.close();
     import_node_fs.default.rmSync(t.fwd, { force: true });
