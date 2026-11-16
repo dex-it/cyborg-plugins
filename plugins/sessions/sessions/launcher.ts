@@ -1,8 +1,9 @@
-import type { Agent, AgentFacts, DocumentInfo, OsPty, PluginContext, Provider, PtyHandle, Remote } from '@cyborg-harness/contracts';
+import type { Agent, AgentEvent, AgentFacts, AgentToolsEndpoint, DocumentInfo, LaunchSpec, OsPty, PluginContext, Provider, PtyHandle, Remote } from '@cyborg-harness/contracts';
 import { validateCreateInput, type CreateInput } from './args.ts';
 import { describe, sessionChange } from './events.ts';
 import { collectFragments } from './prompt.ts';
 import type { Registry, Tab } from './registry.ts';
+import type { Lineage } from './delegation.ts';
 import type { SessionLabelsPatch } from '@cyborg-plugins/contracts';
 
 // Жизненный цикл сессии: открыть (проверка каталогов, выбор агента, запуск в pty потребителя), следить за событиями агента и выходом процесса,
@@ -35,6 +36,21 @@ interface Saved {
   readonly cwd: string;
   readonly addDirs: readonly string[];
   readonly resumeId?: string;
+  /** Кто открыл сессию и к какой семье она относится: метка и цвет вкладки (рисует вид). */
+  readonly lineage: Lineage;
+}
+
+/** Точки подключения делегирования (delegate.ts): сессия получает MCP-инструменты, плагин Claude Code и учёт состояния. Без него launcher работает как до M-04. */
+export interface LauncherHooks {
+  /** Перед запуском: токен и адрес сервера MCP, дополнения к промпту и аргументы запуска (ключ плагина Claude Code). */
+  prepare(sessionId: string): Promise<{ tools?: AgentToolsEndpoint; fragments: readonly string[]; args: readonly string[] }>;
+  lineageOf(parent: string | undefined): Lineage;
+  /** Вкладка добавлена в реестр. */
+  attach(tab: Tab, lineage: Lineage, adopted: boolean): void;
+  /** Событие агента сессии. */
+  event(tab: Tab, e: AgentEvent): void;
+  /** Процесс вышел либо запуск не удался: токен отозван, очередь снята. */
+  ended(sessionId: string): void;
 }
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -47,13 +63,30 @@ const strings = (data: unknown, key: string): string[] => {
   return Array.isArray(value) ? value.filter((x): x is string => typeof x === 'string') : [];
 };
 
-const dataOf = (saved: Saved) => ({ agent: saved.agent, sessionId: saved.sessionId, pty: saved.pty, cwd: saved.cwd, addDirs: [...saved.addDirs], ...(saved.resumeId !== undefined && { resumeId: saved.resumeId }) });
+const dataOf = (saved: Saved) => ({
+  agent: saved.agent,
+  sessionId: saved.sessionId,
+  pty: saved.pty,
+  cwd: saved.cwd,
+  addDirs: [...saved.addDirs],
+  ...(saved.resumeId !== undefined && { resumeId: saved.resumeId }),
+  ...(saved.lineage.parent !== undefined && { parent: saved.lineage.parent }),
+  ...(saved.lineage.parentNumber !== undefined && { parentNumber: saved.lineage.parentNumber }),
+  ...(saved.lineage.family !== undefined && { family: saved.lineage.family }),
+});
+/** Родитель и семья из документа вкладки. */
+const lineageIn = (data: unknown): Lineage => {
+  const parent = field(data, 'parent');
+  const family = field(data, 'family');
+  const number = isRecord(data) && typeof data.parentNumber === 'number' && Number.isInteger(data.parentNumber) ? data.parentNumber : undefined;
+  return { ...(parent !== undefined && { parent }), ...(number !== undefined && { parentNumber: number }), ...(family !== undefined && { family }) };
+};
 const byId = (a: { pluginId: string }, b: { pluginId: string }): number => (a.pluginId < b.pluginId ? -1 : a.pluginId > b.pluginId ? 1 : 0);
 
 export interface Launcher {
   /** Поставщики `cyborg.agent` по порядку id. */
   agents(): AgentProvider[];
-  open(input: CreateInput, options?: { labels?: SessionLabelsPatch }): Promise<Opened>;
+  open(input: CreateInput, options?: { labels?: SessionLabelsPatch; parent?: string }): Promise<Opened>;
   /** Восстановление вышедшей сессии вручную в её вкладке (`sessions.restore`). */
   restore(doc: string): Promise<Opened>;
   /** Новый билет на идущую сессию: вид после перезагрузки окна просит его, прежний одноразовый. */
@@ -62,7 +95,16 @@ export interface Launcher {
   adopt(): Promise<void>;
 }
 
-export function createLauncher(ctx: PluginContext, pty: OsPty, registry: Registry): Launcher {
+/**
+ * Дополнительные аргументы запуска (ключ плагина Claude Code) встают сразу за именем скрипта: оболочка входа получает `-lc <скрипт> <argv0> <аргументы claude...>`,
+ * а скрипт агента передаёт "$@" в claude. Форма другая (агент не из семьи claude) - запуск идёт как есть.
+ */
+function withArgs(spec: LaunchSpec, extra: readonly string[]): LaunchSpec {
+  if (extra.length === 0 || spec.args[0] !== '-lc' || spec.args.length < 3) return spec;
+  return { ...spec, args: [...spec.args.slice(0, 3), ...extra, ...spec.args.slice(3)] };
+}
+
+export function createLauncher(ctx: PluginContext, pty: OsPty, registry: Registry, hooks?: LauncherHooks): Launcher {
   let counter = 0;
   const factsCache = new Map<string, { at: number; facts: AgentFacts }>();
   const agents = (): AgentProvider[] => ctx.contracts.all('cyborg.agent', 1).toSorted(byId);
@@ -126,6 +168,7 @@ export function createLauncher(ctx: PluginContext, pty: OsPty, registry: Registr
       over = true;
       if (registry.get(sessionId) === tab) registry.ended(sessionId);
       registry.emit(tab, { type: 'exit', code: exit.code });
+      hooks?.ended(sessionId);
       unwatch?.();
       if (!provider) return;
       void provider.impl.ended(sessionId, exit).then(
@@ -138,6 +181,7 @@ export function createLauncher(ctx: PluginContext, pty: OsPty, registry: Registr
       if (over || !provider || !facts.capabilities.events) return;
       const watch = provider.impl.watch(sessionId, (e) => {
         ctx.log(`${facts.id} ${sessionId}: ${describe(e)}`);
+        hooks?.event(tab, e);
         const change = sessionChange(e);
         if (change) registry.emit(tab, change);
         // Документ закрыт человеком - сохранять некуда.
@@ -150,7 +194,7 @@ export function createLauncher(ctx: PluginContext, pty: OsPty, registry: Registr
     };
   }
 
-  async function open(input: CreateInput, options: { labels?: SessionLabelsPatch } = {}, existing?: DocumentInfo): Promise<Opened> {
+  async function open(input: CreateInput, options: { labels?: SessionLabelsPatch; parent?: string } = {}, existing?: DocumentInfo): Promise<Opened> {
     await checkDirs(input);
     const { provider, facts } = await pick(input.agent);
     if (input.resumeId !== undefined) {
@@ -160,7 +204,10 @@ export function createLauncher(ctx: PluginContext, pty: OsPty, registry: Registr
     }
     // Файлы событий агента лежат в общем `plugin-data`: счётчик и время двух окон могут совпасть, поэтому в id есть случайная часть.
     const sessionId = `s${Date.now().toString(36)}-${crypto.randomUUID().slice(0, 8)}`;
-    const promptFragments = await collectFragments(ctx.contracts.all('cyborg.session-prompt', 1), (m) => ctx.log(m));
+    // Восстановленная вкладка остаётся в своей семье (родитель и семья лежат в документе), новая - у того, кто её открыл.
+    const lineage: Lineage = existing !== undefined ? lineageIn(existing.data) : (hooks?.lineageOf(options.parent) ?? {});
+    const prepared = await hooks?.prepare(sessionId);
+    const promptFragments = [...(await collectFragments(ctx.contracts.all('cyborg.session-prompt', 1), (m) => ctx.log(m))), ...(prepared?.fragments ?? [])];
     let handle: PtyHandle;
     try {
       const spec = await provider.impl.launch({
@@ -170,9 +217,10 @@ export function createLauncher(ctx: PluginContext, pty: OsPty, registry: Registr
         ...(input.prompt !== undefined && { prompt: input.prompt }),
         ...(input.resumeId !== undefined && { resumeId: input.resumeId }),
         ...(promptFragments.length > 0 && { promptFragments }),
+        ...(prepared?.tools && { tools: prepared.tools }),
       });
       try {
-        handle = await pty.spawn({ ...spec, cols: COLS, rows: ROWS, persist: true, describedBy: provider.pluginId });
+        handle = await pty.spawn({ ...withArgs(spec, prepared?.args ?? []), cols: COLS, rows: ROWS, persist: true, describedBy: provider.pluginId });
       } catch (error) {
         // Поставщик уже завёл файлы сессии: убирает он.
         await provider.impl.ended(sessionId, { code: -1 }).catch(() => undefined);
@@ -180,10 +228,11 @@ export function createLauncher(ctx: PluginContext, pty: OsPty, registry: Registr
       }
     } catch (error) {
       factsCache.delete(provider.pluginId);
+      hooks?.ended(sessionId);
       throw error;
     }
     const title = existing?.title ?? `${facts.title} ${String(++counter)}`;
-    const saved: Saved = { agent: provider.pluginId, sessionId, pty: `${handle.id}:${String(handle.pid)}`, cwd: input.cwd, addDirs: input.addDirs, ...(input.resumeId !== undefined && { resumeId: input.resumeId }) };
+    const saved: Saved = { agent: provider.pluginId, sessionId, pty: `${handle.id}:${String(handle.pid)}`, cwd: input.cwd, addDirs: input.addDirs, lineage, ...(input.resumeId !== undefined && { resumeId: input.resumeId }) };
     let doc: string;
     try {
       if (existing) {
@@ -191,6 +240,7 @@ export function createLauncher(ctx: PluginContext, pty: OsPty, registry: Registr
         await ctx.documents.save(doc, { title, data: dataOf(saved) });
       } else doc = await ctx.documents.open('session', { title, data: dataOf(saved) });
     } catch (error) {
+      hooks?.ended(sessionId);
       await handle.kill().catch(() => undefined);
       throw error;
     }
@@ -198,6 +248,7 @@ export function createLauncher(ctx: PluginContext, pty: OsPty, registry: Registr
     if (previous) registry.remove(previous.sessionId);
     const tab: Tab = { sessionId, doc, title, agent: provider.pluginId, dirs: [input.cwd, ...input.addDirs], handle };
     registry.add(tab);
+    hooks?.attach(tab, lineage, false);
     if (options.labels) registry.setLabels(sessionId, options.labels);
     track(tab, handle, provider, saved)(facts);
     ctx.log(`${facts.title}: сессия ${sessionId}, pid ${String(handle.pid)}`);
@@ -232,7 +283,9 @@ export function createLauncher(ctx: PluginContext, pty: OsPty, registry: Registr
       const resumeId = field(doc.data, 'resumeId');
       const tab: Tab = { sessionId, doc: doc.id, title: doc.title, agent, dirs: [cwd, ...addDirs], handle };
       registry.add(tab);
-      const watching = track(tab, handle, provider, { agent, sessionId, pty: `${info.id}:${String(info.pid)}`, cwd, addDirs, ...(resumeId !== undefined && { resumeId }) });
+      const lineage = lineageIn(doc.data);
+      hooks?.attach(tab, lineage, true);
+      const watching = track(tab, handle, provider, { agent, sessionId, pty: `${info.id}:${String(info.pid)}`, cwd, addDirs, lineage, ...(resumeId !== undefined && { resumeId }) });
       ctx.log(`${doc.title}: подхвачена оставленная сессия, pid ${String(handle.pid)}`);
       void provider?.impl.facts().then(watching, (error: unknown) => ctx.log(`${agent}: факты подхваченной сессии - ${String(error)}`, 'warn'));
     }

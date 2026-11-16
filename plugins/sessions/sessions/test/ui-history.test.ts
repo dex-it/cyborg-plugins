@@ -6,7 +6,7 @@ import path from 'node:path';
 import { describe, it } from 'node:test';
 import { mountHistory } from '../ui/history.ts';
 import { FakeElement, until, withDocument } from './dom.ts';
-import { rig, writeJournal, UUID_A, UUID_B, type Rig } from './kit.ts';
+import { claudeArgs, rig, writeJournal, UUID_A, UUID_B, type Rig } from './kit.ts';
 import { asRoot, titleOf, uiRig } from './ui-kit.ts';
 
 const UUID_C = '33333333-3333-3333-3333-333333333333';
@@ -70,7 +70,7 @@ describe('вид «Сессии проекта»', () => {
       await until(() => rows(root).length === 3, 'список');
       click(rows(root)[1]);
       await until(() => r.pty.procs.length === 1, 'сессия запущена');
-      assert.deepEqual(r.last().args.slice(3, 5), ['--resume', UUID_A]);
+      assert.deepEqual(claudeArgs(r.last()).slice(0, 2), ['--resume', UUID_A]);
       assert.deepEqual(r.last().args.slice(-2), ['--add-dir', r.repoB]);
       assert.equal(r.last().options.cwd, r.repoA);
       // главная часть просит вид «Сессии» показать новую вкладку

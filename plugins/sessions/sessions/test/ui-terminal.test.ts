@@ -5,7 +5,7 @@ import path from 'node:path';
 import { describe, it } from 'node:test';
 import { memoryStore } from '@cyborg-harness/testing';
 import { until, type FakeElement } from './dom.ts';
-import { prepare, rig, settle, UUID_A } from './kit.ts';
+import { claudeArgs, prepare, rig, settle, UUID_A } from './kit.ts';
 import { mounted, titleOf } from './ui-kit.ts';
 
 const wheel = (root: FakeElement, deltaY: number, ctrlKey = true, timeStamp = 1): void => void root.fire('wheel', { deltaY, ctrlKey, metaKey: false, timeStamp });
@@ -172,7 +172,7 @@ describe('вид «Сессии»: вкладки прошлого запуск�
         assert.equal(r.pty.procs.length, 0, 'процессов при старте нет');
         (notice.children[1] as FakeElement).fire('click');
         const term = await until(() => m.ui.terms[0], 'терминал восстановленной сессии');
-        assert.deepEqual(r.last().args.slice(3, 5), ['--resume', UUID_A]);
+        assert.deepEqual(claudeArgs(r.last()).slice(0, 2), ['--resume', UUID_A]);
         await until(() => tab.getAttribute('data-state') !== 'exited', 'вкладка ожила');
         assert.equal(m.tabs().length, 1, 'та же вкладка, не новая');
         assert.equal(notice.hidden, true);

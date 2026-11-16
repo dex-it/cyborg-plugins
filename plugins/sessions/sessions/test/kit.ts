@@ -37,6 +37,9 @@ export const settle = (ms = 80): Promise<void> => new Promise((resolve) => setTi
 
 export type Proc = FakePty['procs'][number];
 
+/** Аргументы claude после имени скрипта без дополнений делегирования (`--plugin-dir=`, `--mcp-config=`): их проверяют тесты MCP. */
+export const claudeArgs = (proc: Proc): string[] => proc.args.slice(3).filter((a) => !a.startsWith('--plugin-dir=') && !a.startsWith('--mcp-config='));
+
 export interface ProjectsFake {
   readonly plugin: InlinePlugin;
   /** Репозитории, которые отдаёт `list`; тест меняет их по ходу. */
@@ -99,6 +102,8 @@ export interface Rig extends AsyncDisposable {
   readonly box: Toolbox;
   /** Подставной каталог настроек Claude: он же `home` ядра. */
   readonly home: string;
+  /** Каталог данных плагинов (`<dataRoot>/<id плагина>`). */
+  readonly dataRoot: string;
   /** Репозитории проекта: настоящие пути. */
   readonly repoA: string;
   readonly repoB: string;
@@ -145,6 +150,8 @@ export interface RigOptions {
   /** Готовый каталог дома и набор программ (второй запуск того же приложения). */
   readonly shared?: Shared;
   readonly load?: StartKernelOptions['load'];
+  /** Каталог плагина `sessions`, если тест запускает его копию (с видом в манифесте). */
+  readonly pluginDir?: string;
 }
 
 export interface Shared {
@@ -202,7 +209,7 @@ export async function rig(options: RigOptions = {}): Promise<Rig> {
     },
   };
   const kernel = await startKernel({
-    plugins: [AGENT_DIR, ...(options.noIsolation ? [] : [ISOLATION_DIR]), PLUGIN_DIR, projects.plugin, probePlugin, ...(options.extra ?? [])],
+    plugins: [AGENT_DIR, ...(options.noIsolation ? [] : [ISOLATION_DIR]), options.pluginDir ?? PLUGIN_DIR, projects.plugin, probePlugin, ...(options.extra ?? [])],
     os: {
       home,
       dataDir: dataRoot,
@@ -239,6 +246,7 @@ export async function rig(options: RigOptions = {}): Promise<Rig> {
     kernel,
     box,
     home,
+    dataRoot,
     repoA,
     repoB,
     projects,

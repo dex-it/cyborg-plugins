@@ -7,7 +7,7 @@ import type { Registry } from './registry.ts';
 /**
  * Соответствие каналов владельца ai-cyborg командам плагина; тест сверяет его с манифестом.
  * `session:input` и `session:resize` решает pty-хост ядра (вид пишет в терминал по билету), `sessions.write` и `sessions.resize` - для плагинов и видов без терминала ядра.
- * `history:list` и `history:delete` отдаёт вид «Сессии проекта» (команды заведены в view-bridge.ts). `session:handoffFailed` - часть передачи задачи другой сессии (`Handoffs`), её переносит M-04.
+ * `history:list` и `history:delete` отдаёт вид «Сессии проекта» (команды заведены в view-bridge.ts). `session:handoffFailed` - часть передачи задачи другой сессии: отказ открыть вкладку возвращается вызвавшей модели (`Handoffs.fail` в handoff.ts, M-04); окна в этой цепочке нет.
  */
 export const CHANNELS = {
   'session:create': 'sessions.create',

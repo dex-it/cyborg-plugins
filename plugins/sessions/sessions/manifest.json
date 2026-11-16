@@ -26,7 +26,10 @@
     "sessions.copy": { "args": ["string"] },
     "sessions.paste-text": {},
     "sessions.history.list": { "args": ["string"] },
-    "sessions.history.delete": { "args": ["string", "string", "array", "string"] }
+    "sessions.history.delete": { "args": ["string", "string", "array", "string"] },
+    "sessions.family": {},
+    "sessions.children": {},
+    "sessions.actions": { "args": ["string"] }
   },
   "keybindings": [
     { "key": "CmdOrCtrl+Shift+N", "command": "sessions.new-request" },
@@ -35,6 +38,8 @@
   "documents": { "session": { "restorable": true, "area": "main", "order": 100 } },
   "permissions": {
     "fs.read": ["workspace"],
+    "serve": true,
+    "notify": true,
     "fs.write": ["workspace"],
     "shell": ["any", "http:", "https:"],
     "clipboard": ["read", "write"],

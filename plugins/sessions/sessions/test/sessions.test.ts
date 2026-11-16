@@ -5,7 +5,7 @@ import { access } from 'node:fs/promises';
 import { test } from 'node:test';
 import type { PluginContext } from '@cyborg-harness/contracts';
 import type { InlinePlugin } from '@cyborg-harness/testing';
-import { rig, settle, until, writeJournal, UUID_A } from './kit.ts';
+import { claudeArgs, rig, settle, until, writeJournal, UUID_A } from './kit.ts';
 
 const exists = (file: string): Promise<boolean> => access(file).then(() => true, () => false);
 
@@ -83,7 +83,8 @@ test('сессия не получает окружение приложения
   const names = Object.keys(r.last().options.env);
   for (const name of ['CYBORG_CWD', 'CYBORG_MCP', 'CYBORG_PLUGIN', 'CLAUDECODE', 'CLAUDE_CODE_SESSION_ID', 'CLAUDE_EFFORT']) assert.ok(!names.includes(name), `${name} дошла до сессии`);
   assert.ok(r.last().options.env.CYBORG_EVENTS && r.last().options.env.CYBORG_SETTINGS);
-  assert.ok(!names.includes('CYBORG_MCP_TOKEN'), 'токена MCP без инструментов плагинов нет');
+  // С M-04 у каждой сессии есть сервер MCP сессий и свой токен: он идёт переменной окружения, и только ей (тест mcp-server.test.ts).
+  assert.ok(names.includes('CYBORG_MCP_TOKEN'));
 });
 
 test('считаются только работающие сессии', async () => {
@@ -144,7 +145,7 @@ test('агент: названный плагин, незнакомый плаг
 test('сессия с запросом и дополнительными каталогами: аргументы по FR-9002, запрос до --add-dir', async () => {
   await using r = await rig();
   await r.sessions.create({ cwd: r.repoA, addDirs: [r.repoB], prompt: 'почини тесты' });
-  const tail = r.last().args.slice(3);
+  const tail = claudeArgs(r.last());
   assert.equal(tail[0], '--append-system-prompt');
   assert.deepEqual(tail.slice(2), ['почини тесты', '--add-dir', r.repoB]);
 });
@@ -202,7 +203,7 @@ test('продолжение прошлой сессии: id берётся из
   await assert.rejects(r.run('sessions.create', { cwd: r.repoA, resumeId: UUID_A }), /sessions\.resume/);
   assert.equal(r.pty.procs.length, 0);
   const opened = (await r.run('sessions.resume', { cwd: r.repoA, resumeId: UUID_A })) as Opened;
-  assert.deepEqual(r.last().args.slice(3, 5), ['--resume', UUID_A]);
+  assert.deepEqual(claudeArgs(r.last()).slice(0, 2), ['--resume', UUID_A]);
   assert.match(opened.sessionId, /^s/);
   await assert.rejects(r.sessions.create({ cwd: r.repoA, resumeId: '--help' }), /resumeId/);
 });
