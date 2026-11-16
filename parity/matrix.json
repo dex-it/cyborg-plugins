@@ -356,7 +356,7 @@
     {"id": "userData/sessions/<id>.jsonl", "kind": "data", "owner": "agent-claude-code", "task": "M-02", "probe": "jsonl", "status": "ported"},
     {"id": "userData/run-approvals.json", "kind": "data", "owner": "viewer", "task": "M-10", "probe": "run-approvals.json", "status": "not-started"},
     {"id": "userData/workspaces/<хеш>/", "kind": "data", "owner": "core", "task": "-", "probe": "workspaces", "status": "not-started"},
-    {"id": "конфиг MCP сессии (0600) и токен", "kind": "data", "owner": "sessions", "task": "M-04", "probe": "mcp", "status": "ported"},
+    {"id": "конфиг MCP сессии (0600) и токен", "kind": "data", "owner": "sessions", "task": "M-04", "probe": "mcp", "status": "allowlist", "reason": "Токен сессии не пишется на диск совсем: он идёт агенту переменной окружения CYBORG_MCP_TOKEN, а конфиг MCP содержит только URL и ссылку на переменную. Это строже ai-cyborg (файл с правами 0600): шлюз ядра не умеет задавать права файла. Проверено тестом отсутствия токена в аргументах, файлах, журнале и документах (T-05). Стабильный порт serve для подхваченных сессий - вопрос ядра (решение 13: https://dex-it.github.io/cyborg-plugins/development/decisions/)"},
     {"id": "токен Claude для удалённых сессий", "kind": "data", "owner": "remote-sessions", "task": "M-05", "probe": "claude-token", "status": "ported"},
     {"id": "~/.cyborg на SSH-хосте", "kind": "data", "owner": "remote-sessions", "task": "M-05", "probe": ".cyborg", "status": "ported"},
     {"id": ".mcp.json репозиториев (чтение)", "kind": "data", "owner": "claude-extensions", "task": "M-19", "probe": ".mcp.json", "status": "not-started"}
