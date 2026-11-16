@@ -91,7 +91,7 @@ npm run bundle -- code-workspace --pack
 
 Получится `dist/bundles/code-workspace/` с `delivery/` (результат `cyborg-plugin delivery`, его указывают как `builtinDir`), `bundle.json` (состав и версии) и `config.json` (`plugins.enabled`), а рядом архив `code-workspace-1.0.0.tgz`.
 
-Бандлы расширяют друг друга (`extends`), поэтому прикладные наборы строятся на базовых. Запланированы `agent-sessions`, `code-workspace`, `task-trackers` и `ai-cyborg` (всё вместе). Формат и правила - [«Бандлы»](docs/guide/bundles/index.md).
+Бандлы расширяют друг друга (`extends`), поэтому прикладные наборы строятся на базовых. Готов `agent-sessions` (проекты и сессии Claude Code с делегированием, изоляцией и уведомлениями); запланированы `code-workspace`, `task-trackers` и `ai-cyborg` (всё вместе). Формат и правила - [«Бандлы»](docs/guide/bundles/index.md).
 
 ## Быстрый старт
 

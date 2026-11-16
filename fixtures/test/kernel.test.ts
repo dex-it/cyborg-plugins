@@ -125,10 +125,14 @@ describe('фикстуры через шлюз ядра', { skip }, () => {
     using box = toolbox({ slowGit: 0.5 });
     await using kernel = await start(box);
     // Время сравнивается друг с другом: абсолютные пороги ненадёжны под нагрузкой параллельного прогона.
-    const t0 = Date.now();
-    const status = await call(kernel, 'git', ['-C', repo.dir, 'status', '--short']);
-    const fast = Date.now() - t0;
-    assert.equal(status.code, 0, status.stderr);
+    // Быстрый вызов - минимум из трёх замеров: один холодный запуск git под нагрузкой может занять столько же, сколько задержка.
+    let fast = Infinity;
+    for (let i = 0; i < 3; i++) {
+      const t0 = Date.now();
+      const status = await call(kernel, 'git', ['-C', repo.dir, 'status', '--short']);
+      fast = Math.min(fast, Date.now() - t0);
+      assert.equal(status.code, 0, status.stderr);
+    }
     const t1 = Date.now();
     const top = await call(kernel, 'git', ['-C', repo.dir, 'rev-parse', '--show-toplevel']);
     const slow = Date.now() - t1;
