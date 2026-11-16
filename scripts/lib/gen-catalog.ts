@@ -6,6 +6,7 @@ import path from 'node:path';
 import { checkRepo } from './check-all.ts';
 import { resolveBundle } from './bundles.ts';
 import { effectiveContracts } from './design.ts';
+import { loadMatrix, summarize } from './parity.ts';
 import { providedVersions } from './semver.ts';
 import { isRecord } from './util.ts';
 import type { Problem } from './util.ts';
@@ -136,6 +137,35 @@ function contractsPage(root: string): string {
   return out;
 }
 
+const KIND_WORDS: Record<string, string> = { requirement: 'Требования', channel: 'Каналы IPC', event: 'События окну', storage: 'Ключи хранилища', dialog: 'Диалоги', data: 'Файлы данных' };
+const STATUS_ROWS: Record<string, string> = { 'not-started': 'не начато', ported: 'перенесено', parity: 'паритет подтверждён', allowlist: 'допустимое расхождение' };
+
+function paritySummary(root: string): string | undefined {
+  const matrix = loadMatrix(root, []);
+  if (!matrix) return undefined;
+  const { catalog } = checkRepo(root);
+  const s = summarize(matrix);
+  const kinds = Object.keys(KIND_WORDS);
+  const owner = (id: string): string => {
+    const p = catalog.plugins.find((x) => x.id === id);
+    return p ? `[\`${id}\`](/catalog/${p.category}/${p.id}/)` : `\`${id}\``;
+  };
+  let out = front('Паритет с ai-cyborg', 'Сколько функций ai-cyborg перенесено: требования, каналы, события, ключи, диалоги и файлы данных по владельцам и задачам.', 92);
+  const done = (s.byStatus.parity ?? 0) + (s.byStatus.allowlist ?? 0);
+  out += `Критерий «ничего не потеряно»: каждая строка ниже имеет плагин-владельца, задачу переноса и статус. Матрица - данные \`parity/matrix.json\`, скрипт \`npm run parity -- <клон ai-cyborg>\` сверяет её с настоящим кодом приложения и ловит новое и исчезнувшее. Якорь: [${matrix.source.repo} \`${matrix.source.commit.slice(0, 7)}\`](https://github.com/${matrix.source.repo}/tree/${matrix.source.commit}) от ${matrix.source.date}.\n\n`;
+  out += `**Готово ${done} из ${s.total}** (паритет подтверждён или допустимое расхождение).\n\n`;
+  out += `## По видам и статусам\n\n| Вид | Строк |\n|---|---|\n${kinds.map((k) => `| ${KIND_WORDS[k]} | ${s.byKind[k] ?? 0} |`).join('\n')}\n\n`;
+  out += `| Статус | Строк |\n|---|---|\n${Object.keys(STATUS_ROWS).map((k) => `| ${STATUS_ROWS[k]} | ${s.byStatus[k] ?? 0} |`).join('\n')}\n\n`;
+  out += `## По владельцам\n\n| Владелец | ${kinds.map((k) => KIND_WORDS[k]).join(' | ')} | Всего |\n|---|${kinds.map(() => '---').join('|')}|---|\n`;
+  for (const [id, counts] of [...s.byOwner].sort(([a], [b]) => a.localeCompare(b))) {
+    const total = Object.values(counts).reduce((a, b) => a + b, 0);
+    out += `| ${owner(id)} | ${kinds.map((k) => counts[k] ?? 0).join(' | ')} | ${total} |\n`;
+  }
+  out += `\n## По задачам эпика\n\n| Задача | Строк | Готово |\n|---|---|---|\n`;
+  for (const [task, v] of [...s.byTask].sort(([a], [b]) => a.localeCompare(b))) out += `| ${task === '-' ? 'ядро и вне кода' : `\`${task}\``} | ${v.rows} | ${v.done} |\n`;
+  return out;
+}
+
 function indexPage(root: string): string {
   const { catalog, bundles } = checkRepo(root);
   let out = front('Каталог', 'Плагины репозитория по назначению и бандлы из них.', 0);
@@ -161,6 +191,8 @@ export function generatePages(root: string): Map<string, string> {
   });
   pages.set('bundles.md', bundlesPage(root));
   pages.set('contracts.md', contractsPage(root));
+  const parity = paritySummary(root);
+  if (parity) pages.set('parity.md', parity);
   return pages;
 }
 

@@ -11,6 +11,7 @@ import path from 'node:path';
 import { LABELS_FILE, checkCategoryLabels, loadLabels } from './labels.ts';
 import { DESIGN_FILE, checkDesign, loadDesign } from './design.ts';
 import type { Design } from './design.ts';
+import { SPECIAL_OWNERS, loadMatrix, validateMatrix } from './parity.ts';
 import { GENERATED_FILE, assetsStatus } from './embed-assets.ts';
 
 export interface CheckResult {
@@ -31,6 +32,9 @@ export function checkRepo(root: string): CheckResult {
   // Модель контрактов проверяется, если репозиторий её ведёт (plugins/planned-contracts.json): временные репозитории тестов файла не имеют.
   const design = loadDesign(root, problems);
   if (existsSync(path.join(root, DESIGN_FILE))) notes.push(...checkDesign(catalog, bundles, design, problems).notes);
+  // Матрица паритета с ai-cyborg (parity/matrix.json): владельцы - плагины каталога, запланированные, ядро и «вне кода».
+  const matrix = loadMatrix(root, problems);
+  if (matrix) validateMatrix(matrix, new Set([...catalog.plugins.map((p) => p.id), ...catalog.categories.flatMap((cat) => cat.planned.map((p) => p.id)), ...SPECIAL_OWNERS]), problems);
   for (const plugin of catalog.plugins) {
     const status = assetsStatus(plugin.dir);
     const where = `${plugin.rel}/${GENERATED_FILE}`;
