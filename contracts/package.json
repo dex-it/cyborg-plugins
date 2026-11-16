@@ -1,0 +1,11 @@
+{
+  "name": "@cyborg-plugins/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Типы контрактов cyborg.projects, cyborg.project-settings и cyborg.editor: временный дом, пока их нет в @cyborg-harness/contracts (cyborg-harness#256)",
+  "engines": { "node": ">=24" },
+  "exports": {
+    ".": "./index.ts"
+  }
+}

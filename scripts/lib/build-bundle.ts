@@ -11,7 +11,7 @@ import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:
 import path from 'node:path';
 import { checkRepo } from './check-all.ts';
 import { BUNDLE_FORMAT, resolveBundle } from './bundles.ts';
-import { runCyborgPlugin } from './harness.ts';
+import { DECLARATION_FLAGS, runCyborgPlugin } from './harness.ts';
 import type { Problem } from './util.ts';
 
 export interface BuildOptions {
@@ -44,7 +44,7 @@ export function buildBundle(root: string, id: string, options: BuildOptions): { 
 
   const byId = new Map(catalog.plugins.map((p) => [p.id, p]));
   const dirs = ids.map((pluginId) => byId.get(pluginId)?.dir ?? '');
-  const run = runCyborgPlugin(['delivery', ...dirs, '--out', path.join(bundleDir, 'delivery')], root);
+  const run = runCyborgPlugin(['delivery', ...dirs, '--out', path.join(bundleDir, 'delivery'), ...DECLARATION_FLAGS], root);
   if (run.status !== 0) return { problems: [{ where: id, message: `cyborg-plugin delivery завершился с кодом ${run.status}` }] };
 
   const manifest = {

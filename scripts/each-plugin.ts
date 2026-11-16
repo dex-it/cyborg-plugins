@@ -9,7 +9,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { loadCatalog } from './lib/catalog.ts';
-import { runCyborgPlugin } from './lib/harness.ts';
+import { DECLARATION_FLAGS, runCyborgPlugin } from './lib/harness.ts';
 import { REPO_ROOT, printProblems } from './lib/util.ts';
 
 const [action = '', ...rest] = process.argv.slice(2);
@@ -43,8 +43,8 @@ let failed = 0;
 for (const p of plugins) {
   console.log(`\n== ${action} ${p.rel}`);
   let status = 0;
-  if (action === 'check') status = runCyborgPlugin(['check', p.dir]).status;
-  else if (action === 'build') status = runCyborgPlugin(['build', p.dir, '--out', path.join(REPO_ROOT, 'dist', 'plugins', p.id)]).status;
+  if (action === 'check') status = runCyborgPlugin(['check', p.dir, ...DECLARATION_FLAGS]).status;
+  else if (action === 'build') status = runCyborgPlugin(['build', p.dir, '--out', path.join(REPO_ROOT, 'dist', 'plugins', p.id), ...DECLARATION_FLAGS]).status;
   else if (hasScript(p.dir, action)) status = spawnSync('npm', ['run', '--silent', action], { cwd: p.dir, stdio: 'inherit' }).status ?? 1;
   else console.log(`у плагина нет скрипта ${action}, пропущен`);
   if (status !== 0) failed++;

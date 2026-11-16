@@ -17,6 +17,6 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["scripts", "fixtures"],
+  "include": ["scripts", "fixtures", "contracts"],
   "exclude": ["node_modules", "dist"]
 }
